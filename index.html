@@ -17,6 +17,7 @@
                 <button class="nav-step" data-step="accounts">1. Accounts</button>
                 <button class="nav-step" data-step="buckets">2. Buckets</button>
                 <button class="nav-step" data-step="classification">3. Classify</button>
+                <button class="nav-step" data-step="review">4. Breakdown</button>
             </nav>
         </header>
 
@@ -60,11 +61,14 @@
                 <div id="account-suggestions" class="account-suggestions"></div>
                 <div id="account-confirmation" class="account-confirmation"></div>
                 <div style="margin-top: 16px; display: flex; gap: 12px;">
+                    <button id="save-accounts-btn" class="btn btn-secondary">
+                        Save Accounts
+                    </button>
                     <button id="proceed-to-buckets-btn" class="btn btn-primary" style="display: none;">
                         Continue to Bucket Setup →
                     </button>
                     <button id="manage-accounts-btn" class="btn btn-secondary">
-                        Manage Saved Accounts
+                        Manage / Merge Saved Accounts
                     </button>
                 </div>
             </section>
@@ -90,6 +94,16 @@
             <section id="accounts-section" class="card" style="display: none;">
                 <h2>Account Allocations</h2>
                 <div id="accounts-list" class="accounts-list"></div>
+                <button id="proceed-to-review-btn" class="btn btn-primary" style="margin-top: 16px;">
+                    Show Bank Bucket Breakdown →
+                </button>
+            </section>
+
+            <!-- Review Section (Phase 4) -->
+            <section id="review-section" class="card" style="display: none;">
+                <h2>Bank Bucket Breakdown</h2>
+                <p class="phase-description">Final breakdown of your accounts and their buckets.</p>
+                <div id="breakdown-list" class="breakdown-list"></div>
             </section>
 
             <!-- Export Section -->

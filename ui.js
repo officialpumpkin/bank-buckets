@@ -260,7 +260,7 @@ const UI = {
             Storage.saveBuckets(buckets);
             const phase = WorkflowManager.getCurrentPhase();
             if (phase === WorkflowManager.PHASES.BUCKETS) {
-                this.renderPerAccountBuckets();
+                this.renderPerAccountBuckets(bucketId);
             } else {
                 this.renderBucketManagement();
             }
@@ -566,6 +566,9 @@ const UI = {
 
             container.appendChild(item);
         });
+
+        // Update proceed button visibility based on initial state
+        this.updateProceedToBucketsButton();
     },
 
     /**
@@ -786,21 +789,27 @@ const UI = {
     /**
      * Render per-account bucket management (Phase 2)
      */
-    renderPerAccountBuckets() {
+    renderPerAccountBuckets(expandedBucketId = null) {
         const container = document.getElementById('bucket-management');
         
         // Preserve open/closed state of details elements
         const openAccountNumbers = new Set();
+        const openBucketIds = new Set();
         const existingDetails = container.querySelectorAll('details');
-        const isFirstRender = existingDetails.length === 0;
         
-        if (!isFirstRender) {
+        if (existingDetails.length > 0) {
             existingDetails.forEach(el => {
                 if (el.hasAttribute('open')) {
                     const contentDiv = el.querySelector('.buckets-for-account');
                     if (contentDiv && contentDiv.id) {
                         const accNum = contentDiv.id.replace('buckets-', '');
                         openAccountNumbers.add(accNum);
+                    } else {
+                        // Check if it's a bucket details
+                        const bucketItem = el.closest('.bucket-item');
+                        if (bucketItem && bucketItem.id) {
+                            openBucketIds.add(bucketItem.id.replace('bucket-', ''));
+                        }
                     }
                 }
             });
@@ -841,8 +850,12 @@ const UI = {
         savingsAccounts.forEach(account => {
             const accountBuckets = buckets.filter(b => b.account_number === account.account_number);
             
-            // Determine open state: Open by default on first render, otherwise restore state
-            const isOpen = isFirstRender || openAccountNumbers.has(account.account_number);
+            // Determine open state: Restore state (default closed if not in set)
+            // BUT force open if this account contains the newly created bucket
+            let isOpen = openAccountNumbers.has(account.account_number);
+            if (expandedBucketId && accountBuckets.some(b => b.id === expandedBucketId)) {
+                isOpen = true;
+            }
 
             const accountSection = document.createElement('div');
             accountSection.className = 'account-bucket-section';
@@ -869,7 +882,7 @@ const UI = {
 
             // Render buckets for this account
             const bucketsContainer = accountSection.querySelector(`#buckets-${account.account_number}`);
-            this.renderBucketsForAccount(account.account_number, accountBuckets, bucketsContainer);
+            this.renderBucketsForAccount(account, accountBuckets, bucketsContainer, expandedBucketId, openBucketIds);
         });
 
         // Update proceed button
@@ -879,7 +892,7 @@ const UI = {
     /**
      * Render buckets for a specific account
      */
-    renderBucketsForAccount(accountNumber, buckets, container) {
+    renderBucketsForAccount(account, buckets, container, expandedBucketId = null, openBucketIds = new Set()) {
         container.innerHTML = '';
 
         if (buckets.length === 0) {
@@ -888,11 +901,18 @@ const UI = {
         }
 
         const startingAllocations = Storage.getStartingAllocations();
+        const accountBalance = parseFloat(account.balance) || 0;
+        
+        // Calculate total allocated so far for this account
+        const totalAllocated = buckets.reduce((sum, b) => {
+            return sum + (parseFloat(startingAllocations[b.id]?.amount) || 0);
+        }, 0);
 
         buckets.forEach(bucket => {
             const item = document.createElement('div');
             item.className = 'bucket-item';
             item.id = `bucket-${bucket.id}`;
+            item.style.marginBottom = '10px';
 
             const keywordsHtml = (bucket.keywords || []).map((keyword, idx) => `
                 <div class="keyword-input-group">
@@ -905,40 +925,59 @@ const UI = {
             const allocation = startingAllocations[bucket.id];
             const allocationAmount = allocation ? parseFloat(allocation.amount) || 0 : 0;
             const allocationDate = allocation ? allocation.date : '';
+            
+            // Calculate remaining available for this bucket (Account Balance - Other Buckets)
+            const availableForBucket = Math.max(0, accountBalance - (totalAllocated - allocationAmount));
+            
+            // Determine if bucket should be open (expanded)
+            const isBucketOpen = (bucket.id === expandedBucketId) || openBucketIds.has(bucket.id);
 
             item.innerHTML = `
-                <div class="bucket-header" style="align-items: flex-end;">
-                    <div style="flex-grow: 1; margin-right: 15px;">
-                        <label style="display: block; font-weight: 500; font-size: 0.9em; margin-bottom: 6px; color: #555;">Bucket Name:</label>
-                        <input type="text" class="bucket-name-input" value="${bucket.name}" 
-                               onchange="UI.updateBucketName('${bucket.id}', this.value)" style="width: 100%;">
+                <details ${isBucketOpen ? 'open' : ''} style="background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <summary style="cursor: pointer; padding: 12px; font-weight: 500; display: flex; align-items: center; justify-content: space-between; outline: none;">
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-weight: 600; font-size: 1.05em;">${bucket.name}</span>
+                        </div>
+                        <span class="dropdown-arrow" style="font-size: 0.8em; color: #999;">▼</span>
+                    </summary>
+                    
+                    <div class="bucket-details-content" style="padding: 15px; border-top: 1px solid #f0f0f0;">
+                        <div class="bucket-header" style="align-items: flex-end;">
+                            <div style="flex-grow: 1; margin-right: 15px;">
+                                <label style="display: block; font-weight: 500; font-size: 1.1em; margin-bottom: 6px; color: #555;">Bucket Name:</label>
+                                <input type="text" class="bucket-name-input" value="${bucket.name}" 
+                                       onchange="UI.updateBucketName('${bucket.id}', this.value)" style="width: 100%;">
+                            </div>
+                            <button class="btn btn-danger btn-small" onclick="UI.deleteBucket('${bucket.id}')" style="margin-bottom: 2px;">Delete Bucket</button>
+                        </div>
+                        <div class="bucket-keywords">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9em; color: #555;">Keywords (for auto-assignment):</label>
+                            ${keywordsHtml}
+                            <button class="btn btn-secondary btn-small add-keyword-btn" onclick="UI.addBucketKeyword('${bucket.id}')">+ Add Keyword</button>
+                        </div>
+                        <details class="bucket-starting-balance-details" style="margin-top: 12px; border-top: 1px solid #dee2e6; padding-top: 12px;">
+                            <summary style="cursor: pointer; font-weight: 500; font-size: 0.9em; color: #555; outline: none;">Starting Balance</summary>
+                            <div class="bucket-starting-balance-content" style="margin-top: 10px;">
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <input type="number" step="0.01" id="starting-amount-${bucket.id}" class="starting-amount-input" 
+                                           value="${allocationAmount}" 
+                                           placeholder="0.00"
+                                           onchange="UI.updateStartingAllocation('${bucket.id}', this.value, document.getElementById('starting-date-${bucket.id}').value)"
+                                           style="width: 120px; padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <span style="font-weight: 500;">$</span>
+                                    <input type="date" id="starting-date-${bucket.id}" 
+                                           value="${allocationDate}" 
+                                           onchange="UI.updateStartingAllocation('${bucket.id}', document.getElementById('starting-amount-${bucket.id}').value, this.value)"
+                                           style="padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <span style="color: #7f8c8d; font-size: 0.9em;">Date</span>
+                                </div>
+                                <p style="color: #7f8c8d; font-size: 0.85em; margin-top: 4px; font-style: italic;">
+                                    Transactions before this date will be ignored for this bucket.
+                                </p>
+                            </div>
+                        </details>
                     </div>
-                    <button class="btn btn-danger btn-small" onclick="UI.deleteBucket('${bucket.id}')" style="margin-bottom: 2px;">Delete Bucket</button>
-                </div>
-                <div class="bucket-keywords">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Keywords (for auto-assignment):</label>
-                    ${keywordsHtml}
-                    <button class="btn btn-secondary btn-small add-keyword-btn" onclick="UI.addBucketKeyword('${bucket.id}')">+ Add Keyword</button>
-                </div>
-                <div class="bucket-starting-balance" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #dee2e6;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Starting Balance:</label>
-                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <input type="number" step="0.01" id="starting-amount-${bucket.id}" class="starting-amount-input" 
-                               value="${allocationAmount}" 
-                               placeholder="0.00"
-                               onchange="UI.updateStartingAllocation('${bucket.id}', this.value, document.getElementById('starting-date-${bucket.id}').value)"
-                               style="width: 120px; padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
-                        <span style="font-weight: 500;">$</span>
-                        <input type="date" id="starting-date-${bucket.id}" 
-                               value="${allocationDate}" 
-                               onchange="UI.updateStartingAllocation('${bucket.id}', document.getElementById('starting-amount-${bucket.id}').value, this.value)"
-                               style="padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
-                        <span style="color: #7f8c8d; font-size: 0.9em;">Date</span>
-                    </div>
-                    <p style="color: #7f8c8d; font-size: 0.85em; margin-top: 4px; font-style: italic;">
-                        Transactions before this date will be ignored for this bucket.
-                    </p>
-                </div>
+                </details>
             `;
 
             container.appendChild(item);
@@ -963,7 +1002,7 @@ const UI = {
 
         buckets.push(newBucket);
         Storage.saveBuckets(buckets);
-        this.renderPerAccountBuckets();
+        this.renderPerAccountBuckets(newBucket.id);
     },
 
     /**
@@ -1043,6 +1082,7 @@ const UI = {
         // Find unclassified transactions
         const unclassified = transactions.filter(tx => {
             const txId = tx.transaction_id || this.generateTransactionId(tx);
+            if (tx.included === false) return false;
             return !classifications[txId];
         });
 
@@ -1092,6 +1132,7 @@ const UI = {
         // Find still unclassified transactions after auto-assignment
         const stillUnclassified = transactions.filter(tx => {
             const txId = tx.transaction_id || this.generateTransactionId(tx);
+            if (tx.included === false) return false;
             return !updatedClassifications[txId];
         }).filter(tx => {
             const txAccountNum = tx.account_number || 'unknown';
@@ -1145,8 +1186,9 @@ const UI = {
         });
 
         Object.keys(byAccount).forEach(accountNum => {
-            const account = savingsAccounts.find(a => a.account_number === accountNum);
-            const accountBuckets = buckets.filter(b => b.account_number === accountNum);
+            const account = savingsAccounts.find(a => String(a.account_number).trim() === String(accountNum).trim());
+            // Robust matching for buckets
+            const accountBuckets = buckets.filter(b => String(b.account_number).trim() === String(accountNum).trim());
             const accountTxs = byAccount[accountNum];
 
             if (!account || accountBuckets.length === 0) {
@@ -1154,11 +1196,38 @@ const UI = {
                 return;
             }
 
+            // Sort by date (newest first)
+            accountTxs.sort((a, b) => {
+                const dateA = new Date(a.transaction_date || a.posted_date || 0);
+                const dateB = new Date(b.transaction_date || b.posted_date || 0);
+                return dateB - dateA;
+            });
+
             const accountSection = document.createElement('div');
-            accountSection.className = 'unclassified-account-section';
+            accountSection.className = 'account-card'; // Collapsed by default
+            accountSection.style.marginBottom = '20px';
+
+            const accountName = account ? account.account_name : `Account ${accountNum}`;
+
             accountSection.innerHTML = `
-                <h4>${account ? account.account_name : accountNum}</h4>
+                <div class="account-header" style="background-color: #f0f4f8; border-bottom: 2px solid #ddd; cursor: pointer;">
+                    <div class="account-info">
+                        <div class="account-name" style="font-size: 1.1em;">${accountName}</div>
+                        <div class="account-number">${accountNum}</div>
+                    </div>
+                    <div style="font-size: 0.9em; color: #666; margin-right: 15px;">
+                        ${accountTxs.length} unclassified
+                    </div>
+                    <div class="expand-icon">▼</div>
+                </div>
+                <div class="account-content">
+                    <div class="unclassified-transactions-list">
+                        <!-- Transactions injected here -->
+                    </div>
+                </div>
             `;
+            
+            const listContainer = accountSection.querySelector('.unclassified-transactions-list');
 
             accountTxs.forEach(tx => {
                 const txId = tx.transaction_id || this.generateTransactionId(tx);
@@ -1168,24 +1237,38 @@ const UI = {
                 const desc = tx.description || tx.user_description || 'Transaction';
                 const amount = parseFloat(tx.amount) || 0;
                 const date = tx.transaction_date || tx.posted_date || 'Unknown date';
+                const source = tx.source_file || 'Unknown Source';
 
                 txRow.innerHTML = `
                     <div class="transaction-info">
-                        <div class="transaction-date">${date}</div>
-                        <div class="transaction-description">${desc}</div>
+                        <div class="transaction-meta" style="font-size: 0.8em; color: #888; display: flex; gap: 10px; margin-bottom: 2px;">
+                            <span class="transaction-date">${date}</span>
+                            <span class="transaction-source" style="font-style: italic;">From: ${source}</span>
+                        </div>
+                        <div class="transaction-description" style="font-weight: 500;">${desc}</div>
                         <div class="transaction-amount ${amount < 0 ? 'negative' : ''}">$${Math.abs(amount).toFixed(2)}</div>
                     </div>
-                    <div class="transaction-classify">
-                        <select class="bucket-select" onchange="UI.classifyTransaction('${txId}', this.value)">
+                    <div class="transaction-classify" style="display: flex; gap: 8px;">
+                        <select class="bucket-select" onchange="UI.classifyTransaction('${txId}', this.value)" style="flex-grow: 1;">
                             <option value="">-- Select Bucket --</option>
                             ${accountBuckets.map(b => 
                                 `<option value="${b.id}">${b.name}</option>`
                             ).join('')}
                         </select>
+                        <button class="btn btn-secondary btn-small" title="Ignore this transaction" 
+                                onclick="UI.ignoreTransaction('${txId}')" 
+                                style="padding: 0 10px; color: #666;">✕</button>
                     </div>
                 `;
+                listContainer.appendChild(txRow);
+            });
 
-                accountSection.appendChild(txRow);
+            // Add toggle logic
+            const header = accountSection.querySelector('.account-header');
+            const content = accountSection.querySelector('.account-content');
+            header.addEventListener('click', () => {
+                header.classList.toggle('expanded');
+                content.classList.toggle('expanded');
             });
 
             container.appendChild(accountSection);
@@ -1207,6 +1290,23 @@ const UI = {
         // Re-render to update counts
         this.renderUnclassifiedTransactions();
         this.renderAccounts();
+    },
+
+    /**
+     * Ignore a transaction
+     */
+    ignoreTransaction(transactionId) {
+        const transactions = Storage.getTransactions();
+        const tx = transactions.find(t => (t.transaction_id || this.generateTransactionId(t)) === transactionId);
+        
+        if (tx) {
+            if (confirm('Are you sure you want to ignore this transaction? It will be excluded from all bucket calculations.')) {
+                tx.included = false;
+                Storage.saveTransactions(transactions);
+                this.renderUnclassifiedTransactions();
+                this.renderAccounts();
+            }
+        }
     },
 
     /**
@@ -1384,13 +1484,34 @@ const UI = {
             });
             Storage.saveBuckets(buckets);
 
-            // Delete Source Account
+            // Delete Source Account from Saved Accounts
             const savedAccounts = Storage.getSavedAccounts();
             const newAccounts = savedAccounts.filter(acc => acc.account_number !== sourceNum);
             Storage.saveSavedAccounts(newAccounts);
 
+            // Update Confirmed Accounts (Remove Source, Ensure Target is Confirmed)
+            const confirmedAccounts = Storage.getConfirmedAccounts();
+            if (confirmedAccounts.length > 0) {
+                const sourceWasConfirmed = confirmedAccounts.some(acc => acc.account_number === sourceNum);
+                const newConfirmed = confirmedAccounts.filter(acc => acc.account_number !== sourceNum);
+                
+                if (sourceWasConfirmed && !newConfirmed.some(acc => acc.account_number === targetNum)) {
+                    const targetAccount = newAccounts.find(acc => acc.account_number === targetNum);
+                    if (targetAccount) {
+                        newConfirmed.push(targetAccount);
+                    }
+                }
+                Storage.saveConfirmedAccounts(newConfirmed);
+            }
+
             UI.showStatus(`Merged successfully. ${txUpdated} transactions and ${bkUpdated} buckets moved.`);
-            UI.renderSavedAccounts();
+            
+            // If we still have enough accounts to merge, stay on the merge screen
+            if (newAccounts.length >= 2) {
+                UI.showMergeAccountsForm();
+            } else {
+                UI.renderSavedAccounts();
+            }
         }
     },
 
@@ -1541,6 +1662,125 @@ const UI = {
         });
 
         return balances;
+    },
+
+    /**
+     * Render final breakdown (Phase 4)
+     */
+    renderBreakdown() {
+        const container = document.getElementById('breakdown-list');
+        const transactions = Storage.getTransactions();
+        const buckets = Storage.getBuckets();
+        const startingAllocations = Storage.getStartingAllocations();
+        const classifications = Storage.getTransactionClassifications();
+        const confirmedAccounts = Storage.getConfirmedAccounts();
+
+        if (transactions.length === 0) {
+            container.innerHTML = '<p>No data available.</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        
+        // Only show confirmed savings accounts
+        const savingsAccounts = confirmedAccounts.filter(acc => acc.account_type === 'savings');
+        
+        if (savingsAccounts.length === 0) {
+            container.innerHTML = '<p>No savings accounts found.</p>';
+            return;
+        }
+
+        savingsAccounts.forEach(account => {
+            const accountBuckets = buckets.filter(b => b.account_number === account.account_number);
+            const accountTransactions = transactions.filter(tx => 
+                (tx.account_number || 'unknown') === account.account_number && tx.included !== false
+            );
+            
+            // Calculate bucket balances
+            const bucketBalances = this.calculateBucketBalancesFromClassifications(
+                accountBuckets,
+                accountTransactions,
+                classifications,
+                startingAllocations
+            );
+
+            const totalBucketsBalance = Object.values(bucketBalances).reduce((sum, b) => sum + (b || 0), 0);
+            
+            // Calculate unallocated (Account Balance - Sum of Buckets)
+            const unallocated = (account.balance || 0) - totalBucketsBalance;
+
+            const card = document.createElement('div');
+            card.className = 'account-card'; // Default collapsed
+            card.style.marginBottom = '20px';
+
+            const accountName = account.account_name || `Account ${account.account_number}`;
+
+            let bucketsHtml = '';
+            if (accountBuckets.length > 0) {
+                accountBuckets.forEach(bucket => {
+                    const balance = bucketBalances[bucket.id] || 0;
+                    bucketsHtml += `
+                        <div class="bucket-row" style="padding: 8px 16px; border-bottom: 1px solid #eee;">
+                            <div class="bucket-row-name" style="font-weight: 500;">${bucket.name}</div>
+                            <div class="bucket-row-balance ${balance < 0 ? 'negative' : ''}">
+                                $${balance.toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                bucketsHtml = '<div style="padding: 16px; font-style: italic; color: #666;">No buckets defined.</div>';
+            }
+            
+            // Add Unallocated if significant
+            if (Math.abs(unallocated) > 0.01) {
+                 bucketsHtml += `
+                        <div class="bucket-row" style="padding: 8px 16px; border-bottom: 1px solid #eee; background-color: #f9f9f9;">
+                            <div class="bucket-row-name" style="font-style: italic;">Unallocated / Remaining</div>
+                            <div class="bucket-row-balance ${unallocated < 0 ? 'negative' : ''}">
+                                $${unallocated.toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+            }
+
+            card.innerHTML = `
+                <div class="account-header" style="background-color: #f0f4f8; border-bottom: 2px solid #ddd; cursor: pointer;">
+                    <div class="account-info">
+                        <div class="account-name" style="font-size: 1.2em;">${accountName}</div>
+                        <div class="account-number">${account.account_number}</div>
+                    </div>
+                    <div class="account-balance ${account.balance < 0 ? 'negative' : ''}" style="font-size: 1.2em; font-weight: bold; margin-right: 15px;">
+                        $${(account.balance || 0).toFixed(2)}
+                    </div>
+                    <div class="expand-icon">▼</div>
+                </div>
+                <div class="account-content">
+                    <div style="padding: 12px 16px; font-weight: bold; color: #555; border-bottom: 1px solid #eee;">
+                        Which is made up of:
+                    </div>
+                    <div class="buckets-list">
+                        ${bucketsHtml}
+                    </div>
+                    <div class="bucket-row" style="padding: 12px 16px; background-color: #e8f5e9; font-weight: bold; border-top: 2px solid #c8e6c9;">
+                        <div class="bucket-row-name">Total Calculated</div>
+                        <div class="bucket-row-balance">
+                             $${(totalBucketsBalance + unallocated).toFixed(2)}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add toggle logic
+            const header = card.querySelector('.account-header');
+            const content = card.querySelector('.account-content');
+            header.addEventListener('click', () => {
+                header.classList.toggle('expanded');
+                content.classList.toggle('expanded');
+            });
+
+            container.appendChild(card);
+        });
     }
 };
 

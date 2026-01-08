@@ -4,7 +4,8 @@ const WorkflowManager = {
     PHASES: {
         ACCOUNTS: 'accounts',      // Phase 1: Setup accounts
         BUCKETS: 'buckets',        // Phase 2: Define buckets per account
-        CLASSIFICATION: 'classification' // Phase 3: Classify transactions
+        CLASSIFICATION: 'classification', // Phase 3: Classify transactions
+        REVIEW: 'review'           // Phase 4: Final Breakdown
     },
 
     /**
@@ -209,6 +210,7 @@ const WorkflowManager = {
         document.getElementById('bucket-setup-section').style.display = 'none';
         document.getElementById('classification-section').style.display = 'none';
         document.getElementById('accounts-section').style.display = 'none';
+        document.getElementById('review-section').style.display = 'none';
         
         // Show appropriate section and render content
         if (phase === this.PHASES.ACCOUNTS) {
@@ -230,6 +232,9 @@ const WorkflowManager = {
             UI.renderUnclassifiedTransactions();
             // Render accounts view
             UI.renderAccounts();
+        } else if (phase === this.PHASES.REVIEW) {
+            document.getElementById('review-section').style.display = 'block';
+            UI.renderBreakdown();
         }
         
         // Always show export if we have data

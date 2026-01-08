@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = await file.text();
             const newTransactions = CSVParser.parse(text);
             
+            // Add source file info
+            newTransactions.forEach(tx => tx.source_file = file.name);
+            
             if (newTransactions.length === 0) {
                 UI.showStatus('No transactions found in CSV file', 'error');
                 return;
@@ -97,6 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Parse PDF
             const newTransactions = await PDFParser.parse(file);
+            
+            // Add source file info
+            newTransactions.forEach(tx => tx.source_file = file.name);
             
             if (newTransactions.length === 0) {
                 UI.showStatus('No transactions found in PDF file', 'error');
@@ -164,6 +170,11 @@ document.addEventListener('DOMContentLoaded', () => {
         WorkflowManager.proceedToNextPhase();
     });
 
+    document.getElementById('proceed-to-review-btn').addEventListener('click', () => {
+        WorkflowManager.setPhase(WorkflowManager.PHASES.REVIEW);
+        window.scrollTo(0, 0);
+    });
+
     // Account management
     document.getElementById('add-account-btn').addEventListener('click', () => {
         UI.showAddAccountForm();
@@ -171,6 +182,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('merge-accounts-btn').addEventListener('click', () => {
         UI.showMergeAccountsForm();
+    });
+
+    document.getElementById('save-accounts-btn').addEventListener('click', () => {
+        const confirmed = Storage.getConfirmedAccounts();
+        const saved = Storage.getSavedAccounts();
+        let addedCount = 0;
+        let updatedCount = 0;
+
+        confirmed.forEach(conf => {
+            const existingIndex = saved.findIndex(s => s.account_number === conf.account_number);
+            
+            const accountToSave = {
+                account_number: conf.account_number,
+                account_name: conf.account_name || `Account ${conf.account_number}`,
+                account_type: conf.account_type,
+                bsb: conf.bsb || null
+            };
+
+            if (existingIndex >= 0) {
+                saved[existingIndex] = accountToSave;
+                updatedCount++;
+            } else {
+                saved.push(accountToSave);
+                addedCount++;
+            }
+        });
+
+        Storage.saveSavedAccounts(saved);
+        UI.showStatus(`Saved ${addedCount} new and updated ${updatedCount} existing accounts.`);
+        
+        // Re-render suggestions to update UI
+        const transactions = Storage.getTransactions();
+        if (transactions.length > 0) {
+            const suggestedAccounts = AccountDetector.detectAccounts(transactions);
+            UI.renderAccountSuggestions(suggestedAccounts);
+        }
     });
 
     document.getElementById('manage-accounts-btn').addEventListener('click', () => {
@@ -220,6 +267,8 @@ function initializeApp() {
             UI.renderPerAccountBuckets();
         } else if (phase === WorkflowManager.PHASES.CLASSIFICATION) {
             UI.renderUnclassifiedTransactions();
+        } else if (phase === WorkflowManager.PHASES.REVIEW) {
+            UI.renderBreakdown();
         }
         
         WorkflowManager.updateUI();

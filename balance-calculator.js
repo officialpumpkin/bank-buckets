@@ -30,6 +30,9 @@ const BalanceCalculator = {
 
         // Apply transactions to buckets
         sortedTransactions.forEach(tx => {
+            // Skip ignored transactions
+            if (tx.included === false) return;
+
             const amount = parseFloat(tx.amount) || 0;
             if (amount === 0) return;
 
