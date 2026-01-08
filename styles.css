@@ -1,0 +1,716 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+}
+
+header h1 {
+    font-size: 2.5em;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: #7f8c8d;
+    font-size: 1.1em;
+}
+
+/* Navigation */
+.main-nav {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 24px;
+    background: white;
+    padding: 8px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+}
+
+.nav-step {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    font-size: 16px;
+    color: #7f8c8d;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.nav-step:hover {
+    color: #3498db;
+    background: #f8f9fa;
+    border-radius: 4px 4px 0 0;
+}
+
+.nav-step.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+    font-weight: 600;
+}
+
+.nav-step:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card h2 {
+    font-size: 1.5em;
+    margin-bottom: 16px;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 8px;
+}
+
+/* Import Section */
+.import-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+#csv-file-input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.btn-secondary {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.status-message {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 4px;
+    display: none;
+    position: relative;
+}
+
+.status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: block;
+}
+
+.status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    display: block;
+}
+
+.status-message.persistent {
+    padding-right: 40px; /* Make room for close button */
+}
+
+.status-content {
+    flex: 1;
+}
+
+.status-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.status-close:hover {
+    opacity: 1;
+}
+
+.status-close:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Bucket Suggestions */
+.bucket-suggestions {
+    margin-bottom: 24px;
+}
+
+.suggestion-item {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border-left: 4px solid #3498db;
+}
+
+.suggestion-item h3 {
+    font-size: 1.1em;
+    margin-bottom: 8px;
+    color: #2c3e50;
+}
+
+.suggestion-item p {
+    color: #7f8c8d;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+}
+
+.suggestion-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.keyword-tag {
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: #495057;
+}
+
+/* Bucket Management */
+.bucket-management {
+    margin-top: 24px;
+}
+
+.bucket-item {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.bucket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.bucket-name-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-right: 12px;
+}
+
+.bucket-keywords {
+    margin-top: 12px;
+}
+
+.keyword-input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.keyword-input {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.add-keyword-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* Accounts List */
+.accounts-list {
+    margin-top: 16px;
+}
+
+.account-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.account-header {
+    background: #e9ecef;
+    padding: 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.account-header:hover {
+    background: #dee2e6;
+}
+
+.account-header.expanded {
+    background: #d0d3d6;
+}
+
+.account-info {
+    flex: 1;
+}
+
+.account-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.account-number {
+    font-size: 0.9em;
+    color: #7f8c8d;
+}
+
+.account-balance {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.account-balance.negative {
+    color: #e74c3c;
+}
+
+.expand-icon {
+    font-size: 1.2em;
+    color: #7f8c8d;
+    transition: transform 0.2s;
+}
+
+.account-header.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+.account-content {
+    padding: 16px;
+    display: none;
+}
+
+.account-content.expanded {
+    display: block;
+}
+
+.buckets-list {
+    margin-top: 16px;
+}
+
+.bucket-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.bucket-row-name {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.bucket-row-balance {
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.bucket-row-balance.negative {
+    color: #e74c3c;
+}
+
+.total-buckets {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 2px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Export Section */
+.export-controls {
+    display: flex;
+    gap: 12px;
+}
+
+/* Starting Allocation Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-content h3 {
+    margin-bottom: 16px;
+    color: #2c3e50;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Phase Description */
+.phase-description {
+    color: #7f8c8d;
+    margin-bottom: 20px;
+    font-style: italic;
+}
+
+/* Account Suggestions */
+.account-suggestions {
+    margin-bottom: 24px;
+}
+
+.account-suggestion-item {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.account-suggestion-info {
+    flex: 1;
+}
+
+.account-suggestion-header {
+    margin-bottom: 8px;
+}
+
+.account-suggestion-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.account-name-input {
+    font-weight: 600;
+    font-size: 1.1em;
+    border: 1px solid #ddd;
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: 200px;
+    margin-bottom: 4px;
+}
+
+.account-suggestion-details {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-top: 4px;
+}
+
+.account-type-selection {
+    margin-top: 12px;
+}
+
+.account-type-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+    color: #2c3e50;
+}
+
+.account-type-label input[type="radio"] {
+    cursor: pointer;
+}
+
+.account-suggestion-actions {
+    margin-left: 16px;
+}
+
+.account-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.account-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Account Bucket Sections */
+.account-bucket-section {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.account-bucket-section h3 {
+    margin-bottom: 12px;
+    color: #2c3e50;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 8px;
+}
+
+.buckets-for-account {
+    margin-top: 12px;
+}
+
+/* Unclassified Transactions */
+.unclassified-transactions {
+    margin-top: 16px;
+}
+
+.unclassified-account-section {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.unclassified-account-section h4 {
+    margin-bottom: 12px;
+    color: #2c3e50;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 8px;
+}
+
+.unclassified-transaction-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.transaction-info {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.transaction-date {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    min-width: 100px;
+}
+
+.transaction-description {
+    flex: 1;
+    color: #2c3e50;
+}
+
+.transaction-amount {
+    font-weight: 600;
+    color: #27ae60;
+    min-width: 80px;
+    text-align: right;
+}
+
+.transaction-amount.negative {
+    color: #e74c3c;
+}
+
+.transaction-classify {
+    margin-left: 16px;
+}
+
+.bucket-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 200px;
+}
+
+/* Saved Accounts Management */
+.saved-accounts-list {
+    margin-top: 16px;
+}
+
+.saved-account-item {
+    background: #f8f9fa;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.saved-account-info {
+    flex: 1;
+}
+
+.saved-account-header {
+    margin-bottom: 8px;
+}
+
+.saved-account-name-input {
+    font-weight: 600;
+    font-size: 1.1em;
+    border: 1px solid #ddd;
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: 200px;
+    margin-bottom: 4px;
+}
+
+.saved-account-details {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-top: 4px;
+}
+
+.saved-account-type-selection {
+    margin-top: 12px;
+}
+
+.saved-account-actions {
+    margin-left: 16px;
+    display: flex;
+    align-items: flex-start;
+}
+

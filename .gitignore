@@ -1,0 +1,16 @@
+# Bank Statements and Data
+*.pdf
+*.csv
+!sample-transactions.csv
+*-debug-log-*.txt
+
+# System
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+

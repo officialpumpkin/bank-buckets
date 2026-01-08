@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Buckets</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bank Buckets</h1>
+            <p class="subtitle">Financial visibility and allocation tool</p>
+            
+            <nav id="main-nav" class="main-nav" style="display: none;">
+                <button class="nav-step" data-step="import">Import</button>
+                <button class="nav-step" data-step="accounts">1. Accounts</button>
+                <button class="nav-step" data-step="buckets">2. Buckets</button>
+                <button class="nav-step" data-step="classification">3. Classify</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Import Section -->
+            <section id="import-section" class="card">
+                <h2>Import Transactions</h2>
+                <div class="import-controls">
+                    <input type="file" id="csv-file-input" accept=".csv" />
+                    <button id="import-csv-btn" class="btn btn-primary">Import CSV</button>
+                    <input type="file" id="pdf-file-input" accept=".pdf" />
+                    <button id="import-pdf-btn" class="btn btn-primary">Import PDF Statement</button>
+                    <button id="manage-accounts-from-import-btn" class="btn btn-secondary" style="display: none;">Manage Accounts</button>
+                    <button id="reset-btn" class="btn btn-danger" style="display: none;">Reset All Data</button>
+                </div>
+                <div id="import-status" class="status-message"></div>
+            </section>
+
+            <!-- Account Management Section -->
+            <section id="account-management-section" class="card" style="display: none;">
+                <h2>Manage Bank Accounts</h2>
+                <p class="phase-description">Add, edit, or delete your bank accounts. These details will be used when importing transactions and matched by account number.</p>
+                <div id="saved-accounts-list" class="saved-accounts-list"></div>
+                <div style="margin-top: 16px; display: flex; gap: 12px;">
+                    <button id="add-account-btn" class="btn btn-primary">
+                        + Add New Account
+                    </button>
+                    <button id="merge-accounts-btn" class="btn btn-secondary">
+                        Merge Accounts
+                    </button>
+                    <button id="back-to-setup-btn" class="btn btn-secondary">
+                        ← Back to Account Setup
+                    </button>
+                </div>
+            </section>
+
+            <!-- Account Setup Section (Phase 1) -->
+            <section id="account-setup-section" class="card" style="display: none;">
+                <h2>Step 1: Setup Bank Accounts</h2>
+                <p class="phase-description">Review and confirm the bank accounts found in your transactions. Saved accounts will be matched automatically.</p>
+                <div id="account-suggestions" class="account-suggestions"></div>
+                <div id="account-confirmation" class="account-confirmation"></div>
+                <div style="margin-top: 16px; display: flex; gap: 12px;">
+                    <button id="proceed-to-buckets-btn" class="btn btn-primary" style="display: none;">
+                        Continue to Bucket Setup →
+                    </button>
+                    <button id="manage-accounts-btn" class="btn btn-secondary">
+                        Manage Saved Accounts
+                    </button>
+                </div>
+            </section>
+
+            <!-- Bucket Setup Section (Phase 2) -->
+            <section id="bucket-setup-section" class="card" style="display: none;">
+                <h2>Step 2: Define Buckets</h2>
+                <p class="phase-description">Create buckets for each account to organise your money.</p>
+                <div id="bucket-management" class="bucket-management"></div>
+                <button id="proceed-to-classification-btn" class="btn btn-primary" style="display: none; margin-top: 16px;">
+                    Continue to Transaction Classification →
+                </button>
+            </section>
+
+            <!-- Classification Section (Phase 3) -->
+            <section id="classification-section" class="card" style="display: none;">
+                <h2>Step 3: Classify Transactions</h2>
+                <p class="phase-description">Assign transactions to buckets. Unclassified transactions are shown below.</p>
+                <div id="unclassified-transactions" class="unclassified-transactions"></div>
+            </section>
+
+            <!-- Accounts and Buckets View -->
+            <section id="accounts-section" class="card" style="display: none;">
+                <h2>Account Allocations</h2>
+                <div id="accounts-list" class="accounts-list"></div>
+            </section>
+
+            <!-- Export Section -->
+            <section id="export-section" class="card" style="display: none;">
+                <h2>Export</h2>
+                <div class="export-controls">
+                    <button id="export-csv-btn" class="btn btn-secondary">Export CSV</button>
+                    <button id="copy-clipboard-btn" class="btn btn-secondary">Copy to Clipboard</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- PDF.js library for PDF parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <script src="storage.js"></script>
+    <script src="csv-parser.js"></script>
+    <script src="pdf-parser.js"></script>
+    <script src="duplicate-detector.js"></script>
+    <script src="account-detector.js"></script>
+    <script src="bucket-suggester.js"></script>
+    <script src="balance-calculator.js"></script>
+    <script src="workflow-manager.js"></script>
+    <script src="ui.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
