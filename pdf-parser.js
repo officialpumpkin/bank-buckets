@@ -180,9 +180,23 @@ const PDFParser = {
         let descriptionLines = [];
         
         let statementYear = new Date().getFullYear();
-        const yearMatch = section.text.match(/statement\s+begins\s+.*(\d{4})/i) || 
-                         section.text.match(/(\d{4})/);
-        if (yearMatch) statementYear = parseInt(yearMatch[1]);
+        // Try to find a valid year (2000-2099) in the header context first
+        const headerText = section.text.substring(0, 1000); // Check first 1000 chars
+        const explicitYearMatch = headerText.match(/statement\s+begins\s+.*?(\d{4})/i) ||
+                                  headerText.match(/period\s+.*?(\d{4})/i) ||
+                                  headerText.match(/date\s+.*?(\d{4})/i);
+        
+        if (explicitYearMatch) {
+            const y = parseInt(explicitYearMatch[1]);
+            if (y >= 2000 && y <= 2100) statementYear = y;
+        } else {
+            // Fallback: Find any 4 digits that look like a recent year (20xx)
+            // Avoid matching account numbers starting with 0242 etc.
+            const genericYearMatches = [...headerText.matchAll(/\b(20\d{2})\b/g)];
+            if (genericYearMatches.length > 0) {
+                statementYear = parseInt(genericYearMatches[0][1]);
+            }
+        }
 
         for (const line of lines) {
             // Header Detection

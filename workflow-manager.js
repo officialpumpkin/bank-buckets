@@ -37,14 +37,15 @@ const WorkflowManager = {
         this.setupNavigation();
         this.updateNavState();
 
+        const buckets = Storage.getBuckets();
+
+        // If no transactions, always show import
         if (transactions.length === 0) {
-            // No transactions - show import
             this.showImportSection();
             return;
         }
 
         const confirmedAccounts = Storage.getConfirmedAccounts();
-        const buckets = Storage.getBuckets();
 
         // Restore correct phase based on data
         if (confirmedAccounts.length === 0) {
@@ -54,7 +55,13 @@ const WorkflowManager = {
         } else {
             // Use saved phase if valid, otherwise default to classification
             const savedPhase = this.getCurrentPhase();
-            this.setPhase(savedPhase || this.PHASES.CLASSIFICATION);
+            
+            // Validate saved phase
+            if (savedPhase && Object.values(this.PHASES).includes(savedPhase)) {
+                this.setPhase(savedPhase);
+            } else {
+                this.setPhase(this.PHASES.CLASSIFICATION);
+            }
         }
     },
 
@@ -124,8 +131,8 @@ const WorkflowManager = {
         document.getElementById('account-setup-section').style.display = 'none';
         document.getElementById('bucket-setup-section').style.display = 'none';
         document.getElementById('classification-section').style.display = 'none';
-        document.getElementById('accounts-section').style.display = 'none';
-        document.getElementById('export-section').style.display = 'none';
+        // document.getElementById('accounts-section') removed
+        // document.getElementById('export-section').style.display = 'none';
         
         // Show import
         document.getElementById('import-section').style.display = 'block';
@@ -209,7 +216,7 @@ const WorkflowManager = {
         document.getElementById('account-setup-section').style.display = 'none';
         document.getElementById('bucket-setup-section').style.display = 'none';
         document.getElementById('classification-section').style.display = 'none';
-        document.getElementById('accounts-section').style.display = 'none';
+        // document.getElementById('accounts-section') removed
         document.getElementById('review-section').style.display = 'none';
         
         // Show appropriate section and render content
@@ -227,11 +234,8 @@ const WorkflowManager = {
             UI.renderPerAccountBuckets();
         } else if (phase === this.PHASES.CLASSIFICATION) {
             document.getElementById('classification-section').style.display = 'block';
-            document.getElementById('accounts-section').style.display = 'block';
             // Render unclassified transactions
             UI.renderUnclassifiedTransactions();
-            // Render accounts view
-            UI.renderAccounts();
         } else if (phase === this.PHASES.REVIEW) {
             document.getElementById('review-section').style.display = 'block';
             UI.renderBreakdown();
@@ -240,7 +244,7 @@ const WorkflowManager = {
         // Always show export if we have data
         const transactions = Storage.getTransactions();
         if (transactions.length > 0) {
-            document.getElementById('export-section').style.display = 'block';
+            // document.getElementById('export-section').style.display = 'block';
             document.getElementById('reset-btn').style.display = 'inline-block';
         }
     }

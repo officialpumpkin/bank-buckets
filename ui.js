@@ -202,11 +202,6 @@ const UI = {
             const phase = WorkflowManager.getCurrentPhase();
             if (phase === WorkflowManager.PHASES.BUCKETS) {
                 this.renderPerAccountBuckets();
-            } else {
-                this.renderAccounts(); // This might be wrong function? renderTransactionClassification?
-                // The snippet showed renderAccounts() in original code, but line 182 comment says renderAccounts.
-                // Let's stick to original logic for render.
-                this.renderAccounts(); 
             }
         }
     },
@@ -223,8 +218,6 @@ const UI = {
             const phase = WorkflowManager.getCurrentPhase();
             if (phase === WorkflowManager.PHASES.BUCKETS) {
                 this.renderPerAccountBuckets();
-            } else {
-                this.renderAccounts();
             }
         }
     },
@@ -243,7 +236,6 @@ const UI = {
                 this.renderPerAccountBuckets();
             } else {
                 this.renderBucketManagement();
-                this.renderAccounts();
             }
         }
     },
@@ -291,154 +283,12 @@ const UI = {
             this.renderPerAccountBuckets();
         } else {
             this.renderBucketManagement();
-            this.renderAccounts();
             if (phase === WorkflowManager.PHASES.CLASSIFICATION) {
                 this.renderUnclassifiedTransactions();
             }
         }
     },
 
-    /**
-     * Render accounts and buckets view (updated to use classifications)
-     */
-    renderAccounts() {
-        const container = document.getElementById('accounts-list');
-        const transactions = Storage.getTransactions();
-        const buckets = Storage.getBuckets();
-        const startingAllocations = Storage.getStartingAllocations();
-        const classifications = Storage.getTransactionClassifications();
-        const confirmedAccounts = Storage.getConfirmedAccounts();
-
-        if (transactions.length === 0) {
-            container.innerHTML = '<p>No transactions imported yet.</p>';
-            return;
-        }
-
-        // Only show savings accounts in the accounts view
-        const savingsAccounts = confirmedAccounts.filter(acc => acc.account_type === 'savings');
-        const accounts = savingsAccounts.length > 0 ? savingsAccounts : 
-            (confirmedAccounts.length > 0 ? confirmedAccounts : CSVParser.extractAccounts(transactions));
-        container.innerHTML = '';
-
-        // Filter to only savings accounts
-        const accountsToShow = accounts.filter(acc => {
-            const confirmed = confirmedAccounts.find(ca => ca.account_number === acc.account_number);
-            return !confirmed || confirmed.account_type === 'savings';
-        });
-
-        accountsToShow.forEach((account, index) => {
-            const accountCard = document.createElement('div');
-            accountCard.className = 'account-card';
-
-            const isMainAccount = index === 0; // First account is main
-            const isExpanded = isMainAccount;
-
-            // Get buckets for this account
-            const accountBuckets = buckets.filter(b => b.account_number === account.account_number);
-            
-            // Get transactions for this account
-            const accountTransactions = transactions.filter(tx => 
-                (tx.account_number || 'unknown') === account.account_number
-            );
-
-            // Calculate balances using classifications
-            const balances = this.calculateBucketBalancesFromClassifications(
-                accountBuckets,
-                accountTransactions,
-                classifications,
-                startingAllocations
-            );
-
-            const totalBuckets = Object.values(balances).reduce((sum, b) => sum + (b || 0), 0);
-
-            // Account header
-            const accountName = account.account_name || `Account ${account.account_number}`;
-            const accountType = account.account_type || '';
-            const typeLabel = accountType === 'day_to_day' ? ' (Day to Day)' : 
-                            accountType === 'savings' ? ' (Savings)' : '';
-            
-            const header = document.createElement('div');
-            header.className = `account-header ${isExpanded ? 'expanded' : ''}`;
-            header.onclick = () => UI.toggleAccount(account.account_number);
-            header.innerHTML = `
-                <div class="account-info">
-                    <div class="account-name">${accountName}${typeLabel}</div>
-                    <div class="account-number">${account.account_number}</div>
-                </div>
-                <div class="account-balance ${account.balance < 0 ? 'negative' : ''}">
-                    $${account.balance.toFixed(2)}
-                </div>
-                <div class="expand-icon">▼</div>
-            `;
-
-            // Account content
-            const content = document.createElement('div');
-            content.className = `account-content ${isExpanded ? 'expanded' : ''}`;
-
-            // Buckets list
-            const bucketsList = document.createElement('div');
-            bucketsList.className = 'buckets-list';
-
-            if (accountBuckets.length === 0) {
-                bucketsList.innerHTML = '<p>No buckets configured for this account. Set up buckets in Step 2.</p>';
-            } else {
-                accountBuckets.forEach(bucket => {
-                    const balance = balances[bucket.id] || 0;
-                    const row = document.createElement('div');
-                    row.className = 'bucket-row';
-                    row.innerHTML = `
-                        <div class="bucket-row-name">
-                            ${bucket.name}
-                            <button class="btn btn-secondary btn-small" 
-                                    onclick="UI.showStartingAllocationModal('${bucket.id}', '${bucket.name.replace(/'/g, "\\'")}')" 
-                                    style="margin-left: 8px; font-size: 11px;">
-                                Set Starting Amount
-                            </button>
-                        </div>
-                        <div class="bucket-row-balance ${balance < 0 ? 'negative' : ''}">
-                            $${balance.toFixed(2)}
-                        </div>
-                    `;
-                    bucketsList.appendChild(row);
-                });
-
-                // Total buckets
-                const totalRow = document.createElement('div');
-                totalRow.className = 'total-buckets';
-                totalRow.innerHTML = `
-                    <span>Total Allocated:</span>
-                    <span>$${totalBuckets.toFixed(2)}</span>
-                `;
-                bucketsList.appendChild(totalRow);
-            }
-
-            content.appendChild(bucketsList);
-            accountCard.setAttribute('data-account', account.account_number);
-            accountCard.appendChild(header);
-            accountCard.appendChild(content);
-            container.appendChild(accountCard);
-        });
-    },
-
-    /**
-     * Toggle account expansion
-     */
-    toggleAccount(accountNumber) {
-        const accountCard = document.querySelector(`[data-account="${accountNumber}"]`);
-        if (!accountCard) return;
-
-        const header = accountCard.querySelector('.account-header');
-        const content = accountCard.querySelector('.account-content');
-
-        const isExpanded = header.classList.contains('expanded');
-        if (isExpanded) {
-            header.classList.remove('expanded');
-            content.classList.remove('expanded');
-        } else {
-            header.classList.add('expanded');
-            content.classList.add('expanded');
-        }
-    },
 
     /**
      * Update starting allocation (called from Step 2 bucket form)
@@ -459,28 +309,6 @@ const UI = {
         }
         
         Storage.saveStartingAllocations(allocations);
-        
-        // Update accounts view if visible
-        const phase = WorkflowManager.getCurrentPhase();
-        if (phase === WorkflowManager.PHASES.CLASSIFICATION) {
-            this.renderAccounts();
-        }
-    },
-
-    /**
-     * Show starting allocation modal (for accounts view)
-     */
-    showStartingAllocationModal(bucketId, bucketName) {
-        // Simple prompt for now - could be enhanced with a proper modal
-        const amount = prompt(`Enter starting allocation amount for "${bucketName}":`);
-        if (amount === null) return;
-
-        const date = prompt(`Enter allocation date (YYYY-MM-DD) or leave blank for today:`) || 
-                     new Date().toISOString().split('T')[0];
-
-        this.updateStartingAllocation(bucketId, amount, date);
-        this.renderAccounts();
-        this.showStatus('Starting allocation saved');
     },
 
     /**
@@ -1090,7 +918,6 @@ const UI = {
 
         if (unclassified.length === 0) {
             container.innerHTML = '<p style="color: #27ae60;">✓ All transactions have been classified!</p>';
-            this.renderAccounts();
             return;
         }
 
@@ -1141,7 +968,6 @@ const UI = {
 
         if (stillUnclassified.length === 0 && beforeCount > 0) {
             container.innerHTML = '<p style="color: #27ae60;">✓ All transactions have been classified!</p>';
-            this.renderAccounts();
             return;
         }
 
@@ -1168,7 +994,6 @@ const UI = {
                 this.showStatus('No transactions matched keywords', 'success');
             }
             this.renderUnclassifiedTransactions();
-            this.renderAccounts();
         };
         container.appendChild(autoAssignBtn);
 
@@ -1273,8 +1098,6 @@ const UI = {
 
             container.appendChild(accountSection);
         });
-
-        this.renderAccounts();
     },
 
     /**
@@ -1289,7 +1112,6 @@ const UI = {
 
         // Re-render to update counts
         this.renderUnclassifiedTransactions();
-        this.renderAccounts();
     },
 
     /**
@@ -1304,7 +1126,6 @@ const UI = {
                 tx.included = false;
                 Storage.saveTransactions(transactions);
                 this.renderUnclassifiedTransactions();
-                this.renderAccounts();
             }
         }
     },
@@ -1719,12 +1540,81 @@ const UI = {
             if (accountBuckets.length > 0) {
                 accountBuckets.forEach(bucket => {
                     const balance = bucketBalances[bucket.id] || 0;
-                    bucketsHtml += `
-                        <div class="bucket-row" style="padding: 8px 16px; border-bottom: 1px solid #eee;">
-                            <div class="bucket-row-name" style="font-weight: 500;">${bucket.name}</div>
-                            <div class="bucket-row-balance ${balance < 0 ? 'negative' : ''}">
-                                $${balance.toFixed(2)}
+                    
+                    // Filter transactions for this bucket
+                    const bucketTransactions = accountTransactions.filter(tx => {
+                        const txId = tx.transaction_id || this.generateTransactionId(tx);
+                        return classifications[txId] === bucket.id;
+                    });
+
+                    // Sort transactions by date (newest first)
+                    bucketTransactions.sort((a, b) => {
+                        const dateA = new Date(a.transaction_date || a.posted_date || 0);
+                        const dateB = new Date(b.transaction_date || b.posted_date || 0);
+                        return dateB - dateA;
+                    });
+
+                    // Check for starting allocation
+                    const allocation = startingAllocations[bucket.id];
+                    
+                    let transactionsHtml = '';
+                    if (allocation) {
+                         transactionsHtml += `
+                            <div class="transaction-row" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; color: #555; font-style: italic;">
+                                <div>Starting Balance (${allocation.date})</div>
+                                <div>$${parseFloat(allocation.amount).toFixed(2)}</div>
                             </div>
+                        `;
+                    }
+
+                    if (bucketTransactions.length === 0 && !allocation) {
+                         transactionsHtml += '<div style="padding: 8px; color: #999; font-style: italic;">No transactions allocated to this bucket.</div>';
+                    } else {
+                        bucketTransactions.forEach(tx => {
+                             // Check if transaction is before allocation date (if exists) and skip if so (logic matches calculation)
+                            if (allocation && allocation.date) {
+                                const txDate = new Date(tx.transaction_date || tx.posted_date || 0);
+                                const allocationDate = new Date(allocation.date);
+                                if (txDate < allocationDate) return;
+                            }
+
+                            const amount = parseFloat(tx.amount) || 0;
+                            // Display amount relative to bucket (credits add, debits subtract usually, but here we just show signed amount)
+                            // Wait, logic in calculation: isCredit ? abs(amount) : -abs(amount)
+                            const isCredit = tx.credit_debit?.toLowerCase() === 'credit' || amount > 0;
+                            const displayAmount = isCredit ? Math.abs(amount) : -Math.abs(amount);
+
+                            transactionsHtml += `
+                                <div class="transaction-row" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; font-size: 0.9em;">
+                                    <div style="flex-grow: 1; padding-right: 10px;">
+                                        <div style="font-weight: 500;">${tx.description || tx.user_description}</div>
+                                        <div style="font-size: 0.85em; color: #888;">${tx.transaction_date || tx.posted_date}</div>
+                                    </div>
+                                    <div style="${displayAmount < 0 ? 'color: #e74c3c;' : 'color: #27ae60;'}">
+                                        $${displayAmount.toFixed(2)}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    bucketsHtml += `
+                        <div class="bucket-row-container" style="border-bottom: 1px solid #eee;">
+                            <details style="width: 100%;">
+                                <summary style="padding: 12px 16px; display: flex; justify-content: space-between; cursor: pointer; align-items: center; list-style: none;">
+                                    <div class="bucket-row-name" style="font-weight: 500; display: flex; align-items: center;">
+                                        ${bucket.name}
+                                        <span class="dropdown-arrow" style="font-size: 0.8em; color: #999; margin-left: 8px;">▼</span>
+                                    </div>
+                                    <div class="bucket-row-balance ${balance < 0 ? 'negative' : ''}">
+                                        $${balance.toFixed(2)}
+                                    </div>
+                                </summary>
+                                <div class="bucket-transactions" style="padding: 0 16px 12px 16px; background-color: #fafafa; border-top: 1px solid #f0f0f0;">
+                                    <div style="font-size: 0.85em; font-weight: 600; color: #777; margin: 8px 0;">Transactions:</div>
+                                    ${transactionsHtml}
+                                </div>
+                            </details>
                         </div>
                     `;
                 });
@@ -1735,52 +1625,56 @@ const UI = {
             // Add Unallocated if significant
             if (Math.abs(unallocated) > 0.01) {
                  bucketsHtml += `
-                        <div class="bucket-row" style="padding: 8px 16px; border-bottom: 1px solid #eee; background-color: #f9f9f9;">
-                            <div class="bucket-row-name" style="font-style: italic;">Unallocated / Remaining</div>
-                            <div class="bucket-row-balance ${unallocated < 0 ? 'negative' : ''}">
-                                $${unallocated.toFixed(2)}
+                        <div class="bucket-row" style="padding: 12px 16px; border-bottom: 1px solid #eee; background-color: #fff3e0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div class="bucket-row-name" style="font-style: italic; color: #e65100;">Unallocated / Remaining</div>
+                                <div class="bucket-row-balance ${unallocated < 0 ? 'negative' : ''}" style="color: #e65100;">
+                                    $${unallocated.toFixed(2)}
+                                </div>
                             </div>
                         </div>
                     `;
             }
 
             card.innerHTML = `
-                <div class="account-header" style="background-color: #f0f4f8; border-bottom: 2px solid #ddd; cursor: pointer;">
-                    <div class="account-info">
-                        <div class="account-name" style="font-size: 1.2em;">${accountName}</div>
-                        <div class="account-number">${account.account_number}</div>
-                    </div>
-                    <div class="account-balance ${account.balance < 0 ? 'negative' : ''}" style="font-size: 1.2em; font-weight: bold; margin-right: 15px;">
-                        $${(account.balance || 0).toFixed(2)}
-                    </div>
-                    <div class="expand-icon">▼</div>
-                </div>
-                <div class="account-content">
-                    <div style="padding: 12px 16px; font-weight: bold; color: #555; border-bottom: 1px solid #eee;">
-                        Which is made up of:
-                    </div>
-                    <div class="buckets-list">
-                        ${bucketsHtml}
-                    </div>
-                    <div class="bucket-row" style="padding: 12px 16px; background-color: #e8f5e9; font-weight: bold; border-top: 2px solid #c8e6c9;">
-                        <div class="bucket-row-name">Total Calculated</div>
-                        <div class="bucket-row-balance">
-                             $${(totalBucketsBalance + unallocated).toFixed(2)}
+                <details style="width: 100%;">
+                    <summary class="account-header" style="background-color: #f0f4f8; border-bottom: 2px solid #ddd; cursor: pointer; padding: 15px; display: flex; justify-content: space-between; align-items: center; list-style: none;">
+                        <div class="account-info">
+                            <div class="account-name" style="font-size: 1.2em; font-weight: 600;">${accountName}</div>
+                            <div class="account-number" style="color: #666;">${account.account_number}</div>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <div class="account-balance ${account.balance < 0 ? 'negative' : ''}" style="font-size: 1.2em; font-weight: bold; margin-right: 15px;">
+                                $${(account.balance || 0).toFixed(2)}
+                            </div>
+                            <div class="expand-icon">▼</div>
+                        </div>
+                    </summary>
+                    <div class="account-content" style="display: block;"> <!-- Always block because details handles visibility -->
+                        <div style="padding: 12px 16px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; background-color: #fff;">
+                            Which is made up of:
+                        </div>
+                        <div class="buckets-list">
+                            ${bucketsHtml}
+                        </div>
+                        <div class="bucket-row" style="padding: 12px 16px; background-color: #e8f5e9; font-weight: bold; border-top: 2px solid #c8e6c9; display: flex; justify-content: space-between;">
+                            <div class="bucket-row-name">Total Calculated</div>
+                            <div class="bucket-row-balance">
+                                 $${(totalBucketsBalance + unallocated).toFixed(2)}
+                            </div>
                         </div>
                     </div>
-                </div>
+                </details>
             `;
             
-            // Add toggle logic
-            const header = card.querySelector('.account-header');
-            const content = card.querySelector('.account-content');
-            header.addEventListener('click', () => {
-                header.classList.toggle('expanded');
-                content.classList.toggle('expanded');
-            });
+            // Remove old custom toggle logic as we use <details> now
+            // const header = card.querySelector('.account-header');
+            // const content = card.querySelector('.account-content');
+            // header.addEventListener('click', () => { ... });
 
             container.appendChild(card);
         });
+
     }
 };
 

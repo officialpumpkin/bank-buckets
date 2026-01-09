@@ -155,8 +155,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Export functionality
-    document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
-    document.getElementById('copy-clipboard-btn').addEventListener('click', copyToClipboard);
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportToCSV);
+    
+    const copyClipboardBtn = document.getElementById('copy-clipboard-btn');
+    if (copyClipboardBtn) copyClipboardBtn.addEventListener('click', copyToClipboard);
 
     // Reset functionality
     document.getElementById('reset-btn').addEventListener('click', resetAllData);
@@ -390,7 +393,7 @@ function resetAllData() {
     document.getElementById('bucket-setup-section').style.display = 'none';
     document.getElementById('classification-section').style.display = 'none';
     document.getElementById('accounts-section').style.display = 'none';
-    document.getElementById('export-section').style.display = 'none';
+    // document.getElementById('export-section').style.display = 'none';
     document.getElementById('reset-btn').style.display = 'none';
 
     // Clear all UI elements
@@ -401,6 +404,7 @@ function resetAllData() {
     document.getElementById('bucket-management').innerHTML = '';
     document.getElementById('unclassified-transactions').innerHTML = '';
     document.getElementById('accounts-list').innerHTML = '';
+    document.getElementById('breakdown-list').innerHTML = '';
     document.getElementById('import-status').className = 'status-message';
     document.getElementById('import-status').innerHTML = '';
 
@@ -417,6 +421,7 @@ function resetAllData() {
     UI.currentSuggestions = [];
 
     // Reset workflow phase
+    Storage.saveWorkflowPhase(WorkflowManager.PHASES.ACCOUNTS); // Explicitly save to storage before reload
     WorkflowManager.setPhase(WorkflowManager.PHASES.ACCOUNTS);
 
     let statusMsg = 'All data has been reset';
@@ -424,5 +429,10 @@ function resetAllData() {
         statusMsg += `. ${savedAccounts.length} saved account(s) preserved.`;
     }
     UI.showStatus(statusMsg, 'success');
+    
+    // Force refresh of the page to ensure clean state
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
 }
 
