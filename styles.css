@@ -1,3 +1,75 @@
+/* CSS Custom Properties for consistent theming */
+:root {
+    /* Primary colors */
+    --color-primary: #3498db;
+    --color-primary-hover: #2980b9;
+    --color-secondary: #95a5a6;
+    --color-secondary-hover: #7f8c8d;
+    
+    /* Status colors */
+    --color-success: #27ae60;
+    --color-success-bg: #d4edda;
+    --color-success-border: #c3e6cb;
+    --color-success-text: #155724;
+    --color-danger: #e74c3c;
+    --color-danger-hover: #c0392b;
+    --color-danger-bg: #f8d7da;
+    --color-danger-border: #f5c6cb;
+    --color-danger-text: #721c24;
+    --color-warning: #e65100;
+    --color-warning-bg: #fff3e0;
+    
+    /* Text colors */
+    --color-text: #333;
+    --color-text-dark: #2c3e50;
+    --color-text-muted: #7f8c8d;
+    --color-text-light: #666;
+    
+    /* Background colors */
+    --color-bg: #f5f5f5;
+    --color-bg-white: #fff;
+    --color-bg-light: #f8f9fa;
+    --color-bg-header: #e9ecef;
+    --color-bg-hover: #dee2e6;
+    --color-bg-expanded: #d0d3d6;
+    
+    /* Border colors */
+    --color-border: #dee2e6;
+    --color-border-light: #ddd;
+    --color-border-focus: #3498db;
+    
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 20px;
+    --spacing-xxl: 24px;
+    
+    /* Border radius */
+    --radius-sm: 3px;
+    --radius-md: 4px;
+    --radius-lg: 8px;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.02);
+    --shadow-md: 0 2px 4px rgba(0,0,0,0.1);
+    --shadow-lg: 0 1px 3px rgba(0,0,0,0.05);
+    
+    /* Font sizes */
+    --font-size-sm: 0.85em;
+    --font-size-md: 0.9em;
+    --font-size-base: 14px;
+    --font-size-lg: 1.1em;
+    --font-size-xl: 1.2em;
+    --font-size-xxl: 1.5em;
+    --font-size-title: 2.5em;
+    
+    /* Transitions */
+    --transition-fast: 0.2s;
+    --transition-normal: 0.3s;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,32 +78,32 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--color-bg);
+    color: var(--color-text);
     line-height: 1.6;
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: var(--spacing-xl);
 }
 
 header {
     text-align: center;
     margin-bottom: 30px;
-    padding: 20px 0;
+    padding: var(--spacing-xl) 0;
 }
 
 header h1 {
-    font-size: 2.5em;
-    color: #2c3e50;
+    font-size: var(--font-size-title);
+    color: var(--color-text-dark);
     margin-bottom: 5px;
 }
 
 .subtitle {
-    color: #7f8c8d;
-    font-size: 1.1em;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-lg);
 }
 
 /* Navigation */
@@ -78,19 +150,19 @@ header h1 {
 }
 
 .card {
-    background: white;
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: var(--color-bg-white);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xxl);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-md);
 }
 
 .card h2 {
-    font-size: 1.5em;
-    margin-bottom: 16px;
-    color: #2c3e50;
-    border-bottom: 2px solid #3498db;
-    padding-bottom: 8px;
+    font-size: var(--font-size-xxl);
+    margin-bottom: var(--spacing-lg);
+    color: var(--color-text-dark);
+    border-bottom: 2px solid var(--color-primary);
+    padding-bottom: var(--spacing-sm);
 }
 
 /* Import Section */
@@ -119,30 +191,30 @@ header h1 {
 }
 
 .btn-primary {
-    background-color: #3498db;
+    background-color: var(--color-primary);
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #2980b9;
+    background-color: var(--color-primary-hover);
 }
 
 .btn-secondary {
-    background-color: #95a5a6;
+    background-color: var(--color-secondary);
     color: white;
 }
 
 .btn-secondary:hover {
-    background-color: #7f8c8d;
+    background-color: var(--color-secondary-hover);
 }
 
 .btn-danger {
-    background-color: #e74c3c;
+    background-color: var(--color-danger);
     color: white;
 }
 
 .btn-danger:hover {
-    background-color: #c0392b;
+    background-color: var(--color-danger-hover);
 }
 
 .btn-small {
@@ -159,16 +231,16 @@ header h1 {
 }
 
 .status-message.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background-color: var(--color-success-bg);
+    color: var(--color-success-text);
+    border: 1px solid var(--color-success-border);
     display: block;
 }
 
 .status-message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger-text);
+    border: 1px solid var(--color-danger-border);
     display: block;
 }
 
@@ -351,27 +423,53 @@ header h1 {
 }
 
 .account-balance {
-    font-size: 1.2em;
+    font-size: var(--font-size-xl);
     font-weight: 600;
-    color: #27ae60;
+    color: var(--color-success);
 }
 
 .account-balance.negative {
-    color: #e74c3c;
+    color: var(--color-danger);
 }
 
 .expand-icon {
     font-size: 1.2em;
-    color: #7f8c8d;
-    transition: transform 0.2s;
+    color: var(--color-text-muted);
+    transition: transform var(--transition-fast);
 }
 
+.dropdown-arrow {
+    display: inline-block;
+    transition: transform var(--transition-fast);
+}
+
+/* Rotate icons when custom expanded class is used */
 .account-header.expanded .expand-icon {
     transform: rotate(180deg);
 }
 
+/* Rotate icons when native <details> is open */
+details[open] > summary .expand-icon,
+details[open] > summary .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+/* Hide default marker on summary elements */
+summary {
+    list-style: none;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+summary::marker {
+    display: none;
+    content: '';
+}
+
 .account-content {
-    padding: 16px;
+    padding: var(--spacing-lg);
     display: none;
 }
 
@@ -401,11 +499,11 @@ header h1 {
 
 .bucket-row-balance {
     font-weight: 600;
-    color: #27ae60;
+    color: var(--color-success);
 }
 
 .bucket-row-balance.negative {
-    color: #e74c3c;
+    color: var(--color-danger);
 }
 
 .total-buckets {
@@ -643,13 +741,13 @@ header h1 {
 
 .transaction-amount {
     font-weight: 600;
-    color: #27ae60;
+    color: var(--color-success);
     min-width: 80px;
     text-align: right;
 }
 
 .transaction-amount.negative {
-    color: #e74c3c;
+    color: var(--color-danger);
 }
 
 .transaction-classify {

@@ -92,7 +92,15 @@ const PDFParser = {
 
         } catch (error) {
             console.error('PDF Parse Error:', error);
-            throw error;
+            // Provide more descriptive error message
+            const errorMessage = error.message || 'Unknown error';
+            if (errorMessage.includes('password')) {
+                throw new Error('This PDF is password protected. Please provide an unencrypted PDF.');
+            } else if (errorMessage.includes('Invalid PDF')) {
+                throw new Error('Invalid or corrupted PDF file. Please check the file and try again.');
+            } else {
+                throw new Error(`Failed to parse PDF: ${errorMessage}. The file may be in an unsupported format.`);
+            }
         }
     },
 
@@ -357,6 +365,15 @@ const PDFParser = {
     },
 
     generateTransactionId(date, desc, amount) {
+        // Use shared utility if available
+        if (window.Utils && Utils.generateTransactionId) {
+            return Utils.generateTransactionId({
+                transaction_date: date ? this.formatDate(date) : null,
+                description: desc,
+                amount: amount
+            });
+        }
+        // Fallback
         const str = `${date ? date.toISOString() : ''}-${desc}-${amount}`;
         let hash = 0;
         for (let i = 0; i < str.length; i++) {

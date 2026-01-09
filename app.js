@@ -392,8 +392,6 @@ function resetAllData() {
     document.getElementById('account-setup-section').style.display = 'none';
     document.getElementById('bucket-setup-section').style.display = 'none';
     document.getElementById('classification-section').style.display = 'none';
-    document.getElementById('accounts-section').style.display = 'none';
-    // document.getElementById('export-section').style.display = 'none';
     document.getElementById('reset-btn').style.display = 'none';
 
     // Clear all UI elements

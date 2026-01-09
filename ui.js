@@ -70,15 +70,18 @@ const UI = {
             const item = document.createElement('div');
             item.className = 'suggestion-item';
             
+            // Use Utils.escapeHtml to prevent XSS attacks
+            const escapeHtml = window.Utils ? Utils.escapeHtml : (t) => t;
+            
             item.innerHTML = `
-                <h3>${suggestion.name}</h3>
+                <h3>${escapeHtml(suggestion.name)}</h3>
                 <p>Found ${suggestion.matchCount} matching transactions</p>
                 <div class="suggestion-keywords">
                     ${suggestion.keywords.slice(0, 5).map(k => 
-                        `<span class="keyword-tag">${k}</span>`
+                        `<span class="keyword-tag">${escapeHtml(k)}</span>`
                     ).join('')}
                 </div>
-                <button class="btn btn-primary btn-small" onclick="UI.acceptSuggestion('${suggestion.id}')" style="margin-top: 8px;">
+                <button class="btn btn-primary btn-small" onclick="UI.acceptSuggestion('${escapeHtml(suggestion.id)}')" style="margin-top: 8px;">
                     Accept & Create Bucket
                 </button>
             `;
@@ -784,7 +787,10 @@ const UI = {
                             <button class="btn btn-secondary btn-small add-keyword-btn" onclick="UI.addBucketKeyword('${bucket.id}')">+ Add Keyword</button>
                         </div>
                         <details class="bucket-starting-balance-details" style="margin-top: 12px; border-top: 1px solid #dee2e6; padding-top: 12px;">
-                            <summary style="cursor: pointer; font-weight: 500; font-size: 0.9em; color: #555; outline: none;">Starting Balance</summary>
+                            <summary style="cursor: pointer; font-weight: 500; font-size: 0.9em; color: #555; outline: none; display: flex; align-items: center; justify-content: space-between;">
+                                <span>Starting Balance</span>
+                                <span class="dropdown-arrow" style="font-size: 0.8em; color: #999;">▼</span>
+                            </summary>
                             <div class="bucket-starting-balance-content" style="margin-top: 10px;">
                                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                                     <input type="number" step="0.01" id="starting-amount-${bucket.id}" class="starting-amount-input" 
@@ -821,7 +827,7 @@ const UI = {
 
         const buckets = Storage.getBuckets();
         const newBucket = {
-            id: 'bucket_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            id: 'bucket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
             name: name.trim(),
             account_number: accountNumber,
             keywords: [name.trim()],
@@ -1064,24 +1070,27 @@ const UI = {
                 const date = tx.transaction_date || tx.posted_date || 'Unknown date';
                 const source = tx.source_file || 'Unknown Source';
 
+                // Use Utils.escapeHtml to prevent XSS attacks
+                const escapeHtml = window.Utils ? Utils.escapeHtml : (t) => t;
+                
                 txRow.innerHTML = `
                     <div class="transaction-info">
                         <div class="transaction-meta" style="font-size: 0.8em; color: #888; display: flex; gap: 10px; margin-bottom: 2px;">
-                            <span class="transaction-date">${date}</span>
-                            <span class="transaction-source" style="font-style: italic;">From: ${source}</span>
+                            <span class="transaction-date">${escapeHtml(date)}</span>
+                            <span class="transaction-source" style="font-style: italic;">From: ${escapeHtml(source)}</span>
                         </div>
-                        <div class="transaction-description" style="font-weight: 500;">${desc}</div>
+                        <div class="transaction-description" style="font-weight: 500;">${escapeHtml(desc)}</div>
                         <div class="transaction-amount ${amount < 0 ? 'negative' : ''}">$${Math.abs(amount).toFixed(2)}</div>
                     </div>
                     <div class="transaction-classify" style="display: flex; gap: 8px;">
-                        <select class="bucket-select" onchange="UI.classifyTransaction('${txId}', this.value)" style="flex-grow: 1;">
+                        <select class="bucket-select" onchange="UI.classifyTransaction('${escapeHtml(txId)}', this.value)" style="flex-grow: 1;">
                             <option value="">-- Select Bucket --</option>
                             ${accountBuckets.map(b => 
-                                `<option value="${b.id}">${b.name}</option>`
+                                `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`
                             ).join('')}
                         </select>
                         <button class="btn btn-secondary btn-small" title="Ignore this transaction" 
-                                onclick="UI.ignoreTransaction('${txId}')" 
+                                onclick="UI.ignoreTransaction('${escapeHtml(txId)}')" 
                                 style="padding: 0 10px; color: #666;">✕</button>
                     </div>
                 `;
@@ -1132,8 +1141,14 @@ const UI = {
 
     /**
      * Generate transaction ID if missing
+     * Uses shared Utils.generateTransactionId for consistency
      */
     generateTransactionId(tx) {
+        // Use shared utility if available for consistent ID generation
+        if (window.Utils && Utils.generateTransactionId) {
+            return Utils.generateTransactionId(tx);
+        }
+        // Fallback for backwards compatibility
         const date = tx.transaction_date || tx.posted_date || 'unknown';
         const desc = (tx.description || tx.user_description || '').substring(0, 20).replace(/\s+/g, '_');
         const amount = Math.abs(parseFloat(tx.amount) || 0).toFixed(2);
@@ -1570,6 +1585,9 @@ const UI = {
                     if (bucketTransactions.length === 0 && !allocation) {
                          transactionsHtml += '<div style="padding: 8px; color: #999; font-style: italic;">No transactions allocated to this bucket.</div>';
                     } else {
+                        // Use Utils.escapeHtml to prevent XSS attacks
+                        const escapeHtml = window.Utils ? Utils.escapeHtml : (t) => t;
+                        
                         bucketTransactions.forEach(tx => {
                              // Check if transaction is before allocation date (if exists) and skip if so (logic matches calculation)
                             if (allocation && allocation.date) {
@@ -1587,8 +1605,8 @@ const UI = {
                             transactionsHtml += `
                                 <div class="transaction-row" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; font-size: 0.9em;">
                                     <div style="flex-grow: 1; padding-right: 10px;">
-                                        <div style="font-weight: 500;">${tx.description || tx.user_description}</div>
-                                        <div style="font-size: 0.85em; color: #888;">${tx.transaction_date || tx.posted_date}</div>
+                                        <div style="font-weight: 500;">${escapeHtml(tx.description || tx.user_description)}</div>
+                                        <div style="font-size: 0.85em; color: #888;">${escapeHtml(tx.transaction_date || tx.posted_date)}</div>
                                     </div>
                                     <div style="${displayAmount < 0 ? 'color: #e74c3c;' : 'color: #27ae60;'}">
                                         $${displayAmount.toFixed(2)}
