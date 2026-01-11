@@ -10,7 +10,8 @@ const Storage = {
         CONFIRMED_ACCOUNTS: 'bank_buckets_confirmed_accounts',
         WORKFLOW_PHASE: 'bank_buckets_workflow_phase',
         TRANSACTION_CLASSIFICATIONS: 'bank_buckets_transaction_classifications',
-        SAVED_ACCOUNTS: 'bank_buckets_saved_accounts' // User-managed account details
+        SAVED_ACCOUNTS: 'bank_buckets_saved_accounts', // User-managed account details
+        IMPORT_STATS: 'bank_buckets_import_stats' // Track import statistics including duplicates
     },
 
     // Cache for performance
@@ -156,6 +157,25 @@ const Storage = {
 
     getSavedAccounts() {
         return this._safeLoad(this.KEYS.SAVED_ACCOUNTS, []);
+    },
+
+    // Import Statistics (track duplicates filtered, etc.)
+    saveImportStats(stats) {
+        return this._safeSave(this.KEYS.IMPORT_STATS, stats);
+    },
+
+    getImportStats() {
+        return this._safeLoad(this.KEYS.IMPORT_STATS, { duplicatesFiltered: 0 });
+    },
+
+    /**
+     * Add to the duplicate count
+     * @param {number} count - Number of duplicates to add
+     */
+    addDuplicatesFiltered(count) {
+        const stats = this.getImportStats();
+        stats.duplicatesFiltered = (stats.duplicatesFiltered || 0) + count;
+        return this.saveImportStats(stats);
     },
 
     // Clear all data

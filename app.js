@@ -1,23 +1,24 @@
 // Main application logic
 
-/**
- * Download PDF Debug Log
- */
-window.downloadPdfDebugLog = function() {
-    console.log('Downloading debug log...');
-    if (!window.PDFParser) {
-        alert('PDFParser not found');
-        return;
-    }
-    const log = PDFParser.getDebugLog();
-    const blob = new Blob([log], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pdf-debug-log-${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-};
+// PDF import disabled - data parsing was unreliable
+// /**
+//  * Download PDF Debug Log
+//  */
+// window.downloadPdfDebugLog = function() {
+//     console.log('Downloading debug log...');
+//     if (!window.PDFParser) {
+//         alert('PDFParser not found');
+//         return;
+//     }
+//     const log = PDFParser.getDebugLog();
+//     const blob = new Blob([log], { type: 'text/plain' });
+//     const url = window.URL.createObjectURL(blob);
+//     const a = document.createElement('a');
+//     a.href = url;
+//     a.download = `pdf-debug-log-${new Date().toISOString().split('T')[0]}.txt`;
+//     a.click();
+//     window.URL.revokeObjectURL(url);
+// };
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI
@@ -32,42 +33,87 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     csvFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
         try {
-            const text = await file.text();
-            const newTransactions = CSVParser.parse(text);
+            UI.showStatus(`Processing ${files.length} file(s)...`, 'success');
             
-            // Add source file info
-            newTransactions.forEach(tx => tx.source_file = file.name);
-            
-            if (newTransactions.length === 0) {
-                UI.showStatus('No transactions found in CSV file', 'error');
-                return;
+            let totalNewTransactions = 0;
+            let totalDuplicates = 0;
+            let filesProcessed = 0;
+            let errors = [];
+
+            // Process each file
+            for (const file of files) {
+                try {
+                    const text = await file.text();
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:csvImport',message:'Processing file',data:{fileName:file.name,fileSize:file.size,textLength:text.length,lineCount:text.split('\n').length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                    // #endregion
+                    
+                    // Pass filename to parser for account number extraction (Qudos Bank format)
+                    const newTransactions = CSVParser.parse(text, file.name);
+                    
+                    // Add source file info
+                    newTransactions.forEach(tx => tx.source_file = file.name);
+                    
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:csvImport',message:'Parsed transactions',data:{fileName:file.name,parsedCount:newTransactions.length,firstTx:newTransactions[0]?{date:newTransactions[0].transaction_date,desc:(newTransactions[0].description||'').substring(0,40),amount:newTransactions[0].amount}:null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                    // #endregion
+                    
+                    if (newTransactions.length === 0) {
+                        errors.push(`${file.name}: No transactions found`);
+                        continue;
+                    }
+
+                    // Merge with existing transactions (handle duplicates)
+                    const existingTransactions = Storage.getTransactions();
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:csvImport',message:'Before merge',data:{fileName:file.name,existingCount:existingTransactions.length,newCount:newTransactions.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                    // #endregion
+                    const mergeResult = DuplicateDetector.mergeTransactions(existingTransactions, newTransactions);
+
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:csvImport',message:'After merge',data:{fileName:file.name,mergedCount:mergeResult.merged.length,duplicatesFound:mergeResult.stats.duplicates,uniqueAdded:mergeResult.stats.unique},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+                    // #endregion
+
+                    // Save merged transactions
+                    Storage.saveTransactions(mergeResult.merged);
+
+                    // Track duplicate count
+                    if (mergeResult.stats.duplicates > 0) {
+                        Storage.addDuplicatesFiltered(mergeResult.stats.duplicates);
+                    }
+
+                    totalNewTransactions += newTransactions.length;
+                    totalDuplicates += mergeResult.stats.duplicates;
+                    filesProcessed++;
+                } catch (fileError) {
+                    errors.push(`${file.name}: ${fileError.message}`);
+                }
             }
 
-            // Merge with existing transactions (handle duplicates)
-            const existingTransactions = Storage.getTransactions();
-            const mergeResult = DuplicateDetector.mergeTransactions(existingTransactions, newTransactions);
-
-            // Save merged transactions
-            Storage.saveTransactions(mergeResult.merged);
-
-            // Extract and save accounts
-            const accounts = CSVParser.extractAccounts(mergeResult.merged);
+            // Extract and save accounts from all transactions
+            const allTransactions = Storage.getTransactions();
+            const accounts = CSVParser.extractAccounts(allTransactions);
             Storage.saveAccounts(accounts);
 
             // Show import results
-            let statusMsg = `Imported ${newTransactions.length} transactions from CSV. `;
-            if (mergeResult.stats.duplicates > 0) {
-                statusMsg += `${mergeResult.stats.duplicates} duplicates filtered out. `;
+            let statusMsg = `Imported ${totalNewTransactions} transactions from ${filesProcessed} file(s). `;
+            if (totalDuplicates > 0) {
+                statusMsg += `${totalDuplicates} duplicates filtered out. `;
             }
-            statusMsg += `Total: ${mergeResult.merged.length} transactions.`;
-            UI.showStatus(statusMsg, 'success');
+            statusMsg += `Total: ${allTransactions.length} transactions.`;
+            
+            if (errors.length > 0) {
+                statusMsg += `<br><span style="color: #e74c3c;">Errors: ${errors.join(', ')}</span>`;
+            }
+            
+            UI.showStatus(statusMsg, errors.length > 0 ? 'error' : 'success', errors.length > 0);
 
             // Detect and suggest accounts (will cross-reference with saved accounts)
-            const suggestedAccounts = AccountDetector.detectAccounts(mergeResult.merged);
+            const suggestedAccounts = AccountDetector.detectAccounts(allTransactions);
             UI.renderAccountSuggestions(suggestedAccounts);
 
             // Show manage accounts button
@@ -77,82 +123,85 @@ document.addEventListener('DOMContentLoaded', () => {
             WorkflowManager.setPhase('accounts');
             WorkflowManager.updateUI();
 
+            // Reset file input so the same files can be selected again if needed
+            csvFileInput.value = '';
+
         } catch (error) {
-            UI.showStatus(`Error importing CSV: ${error.message}`, 'error');
+            UI.showStatus(`Error importing CSV files: ${error.message}`, 'error');
             console.error('CSV import error:', error);
         }
     });
 
-    // PDF Import
-    const pdfFileInput = document.getElementById('pdf-file-input');
-    const importPdfBtn = document.getElementById('import-pdf-btn');
+    // PDF Import - disabled (data parsing was unreliable)
+    // const pdfFileInput = document.getElementById('pdf-file-input');
+    // const importPdfBtn = document.getElementById('import-pdf-btn');
 
-    importPdfBtn.addEventListener('click', () => {
-        pdfFileInput.click();
-    });
+    // importPdfBtn.addEventListener('click', () => {
+    //     pdfFileInput.click();
+    // });
 
-    pdfFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // pdfFileInput.addEventListener('change', async (e) => {
+    //     const file = e.target.files[0];
+    //     if (!file) return;
 
-        try {
-            UI.showStatus('Parsing PDF statement...', 'success');
+    //     try {
+    //         UI.showStatus('Parsing PDF statement...', 'success');
             
-            // Parse PDF
-            const newTransactions = await PDFParser.parse(file);
+    //         // Parse PDF
+    //         const newTransactions = await PDFParser.parse(file);
             
-            // Add source file info
-            newTransactions.forEach(tx => tx.source_file = file.name);
+    //         // Add source file info
+    //         newTransactions.forEach(tx => tx.source_file = file.name);
             
-            if (newTransactions.length === 0) {
-                UI.showStatus('No transactions found in PDF file', 'error');
-                return;
-            }
+    //         if (newTransactions.length === 0) {
+    //             UI.showStatus('No transactions found in PDF file', 'error');
+    //             return;
+    //         }
 
-            // Merge with existing transactions (handle duplicates)
-            const existingTransactions = Storage.getTransactions();
-            const mergeResult = DuplicateDetector.mergeTransactions(existingTransactions, newTransactions);
+    //         // Merge with existing transactions (handle duplicates)
+    //         const existingTransactions = Storage.getTransactions();
+    //         const mergeResult = DuplicateDetector.mergeTransactions(existingTransactions, newTransactions);
 
-            // Save merged transactions
-            Storage.saveTransactions(mergeResult.merged);
+    //         // Save merged transactions
+    //         Storage.saveTransactions(mergeResult.merged);
 
-            // Extract and save accounts
-            const accounts = CSVParser.extractAccounts(mergeResult.merged);
-            Storage.saveAccounts(accounts);
+    //         // Extract and save accounts
+    //         const accounts = CSVParser.extractAccounts(mergeResult.merged);
+    //         Storage.saveAccounts(accounts);
 
-            // Show import results (persistent - user must close it)
-            let statusMsg = `Imported ${newTransactions.length} transactions from PDF. `;
-            if (mergeResult.stats.duplicates > 0) {
-                statusMsg += `${mergeResult.stats.duplicates} duplicates filtered out. `;
-            }
-            statusMsg += `Total: ${mergeResult.merged.length} transactions.`;
+    //         // Show import results (persistent - user must close it)
+    //         let statusMsg = `Imported ${newTransactions.length} transactions from PDF. `;
+    //         if (mergeResult.stats.duplicates > 0) {
+    //             statusMsg += `${mergeResult.stats.duplicates} duplicates filtered out. `;
+    //         }
+    //         statusMsg += `Total: ${mergeResult.merged.length} transactions.`;
             
-            // Optional debug log button
-            statusMsg += `<br><button class="btn btn-secondary btn-small" onclick="downloadPdfDebugLog()" style="margin-top: 8px;">Download Debug Log</button>`;
+    //         // Optional debug log button
+    //         statusMsg += `<br><button class="btn btn-secondary btn-small" onclick="downloadPdfDebugLog()" style="margin-top: 8px;">Download Debug Log</button>`;
             
-            UI.showStatus(statusMsg, 'success', true);
+    //         UI.showStatus(statusMsg, 'success', true);
 
-            // Detect and suggest accounts (will cross-reference with saved accounts)
-            const suggestedAccounts = AccountDetector.detectAccounts(mergeResult.merged);
-            UI.renderAccountSuggestions(suggestedAccounts);
+    //         // Detect and suggest accounts (will cross-reference with saved accounts)
+    //         const suggestedAccounts = AccountDetector.detectAccounts(mergeResult.merged);
+    //         UI.renderAccountSuggestions(suggestedAccounts);
 
-            // Show manage accounts button
-            document.getElementById('manage-accounts-from-import-btn').style.display = 'inline-block';
+    //         // Show manage accounts button
+    //         document.getElementById('manage-accounts-from-import-btn').style.display = 'inline-block';
 
-            // Initialize workflow - force Account Setup phase to review new imports
-            WorkflowManager.setPhase('accounts');
-            WorkflowManager.updateUI();
+    //         // Initialize workflow - force Account Setup phase to review new imports
+    //         WorkflowManager.setPhase('accounts');
+    //         WorkflowManager.updateUI();
 
-        } catch (error) {
-            let errorMsg = `Error importing PDF: ${error.message}`;
+    //     } catch (error) {
+    //         let errorMsg = `Error importing PDF: ${error.message}`;
             
-            // Optional debug log button
-            errorMsg += `<br><button class="btn btn-secondary btn-small" onclick="downloadPdfDebugLog()" style="margin-top: 8px;">Download Debug Log</button>`;
+    //         // Optional debug log button
+    //         errorMsg += `<br><button class="btn btn-secondary btn-small" onclick="downloadPdfDebugLog()" style="margin-top: 8px;">Download Debug Log</button>`;
             
-            UI.showStatus(errorMsg, 'error', true);
-            console.error('PDF import error:', error);
-        }
-    });
+    //         UI.showStatus(errorMsg, 'error', true);
+    //         console.error('PDF import error:', error);
+    //     }
+    // });
 
     // Export functionality
     const exportCsvBtn = document.getElementById('export-csv-btn');
@@ -385,7 +434,8 @@ function resetAllData() {
 
     // Clear file inputs
     document.getElementById('csv-file-input').value = '';
-    document.getElementById('pdf-file-input').value = '';
+    // PDF import disabled
+    // document.getElementById('pdf-file-input').value = '';
 
     // Hide all sections
     document.getElementById('account-management-section').style.display = 'none';

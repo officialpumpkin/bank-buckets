@@ -1,6 +1,50 @@
 // UI rendering and interaction logic
 
 const UI = {
+    // Sort state for transactions (persisted in memory during session)
+    sortState: {
+        unclassified: {},       // Per-account sort state: { accountNumber: 'newest' | 'oldest' }
+        breakdown: {}           // Per-bucket sort state: { bucketId: 'newest' | 'oldest' }
+    },
+
+    // Expanded state for collapsible sections
+    expandedState: {
+        unclassifiedAccounts: new Set(),  // Account numbers that are expanded
+        breakdownAccounts: new Set(),      // Account numbers that are expanded
+        breakdownBuckets: new Set()        // Bucket IDs that are expanded
+    },
+
+    /**
+     * Toggle sort order for unclassified transactions for a specific account
+     */
+    toggleUnclassifiedSort(accountNumber) {
+        const current = this.sortState.unclassified[accountNumber] || 'newest';
+        this.sortState.unclassified[accountNumber] = current === 'newest' ? 'oldest' : 'newest';
+        this.renderUnclassifiedTransactions();
+    },
+
+    /**
+     * Toggle sort order for a specific bucket in breakdown
+     */
+    toggleBreakdownSort(bucketId) {
+        const current = this.sortState.breakdown[bucketId] || 'newest';
+        this.sortState.breakdown[bucketId] = current === 'newest' ? 'oldest' : 'newest';
+        this.renderBreakdown();
+    },
+
+    /**
+     * Get sort comparator for transactions
+     * @param {string} order - 'newest' or 'oldest'
+     * @returns {Function} Comparator function
+     */
+    getDateSortComparator(order) {
+        return (a, b) => {
+            const dateA = new Date(a.transaction_date || a.posted_date || 0);
+            const dateB = new Date(b.transaction_date || b.posted_date || 0);
+            return order === 'newest' ? dateB - dateA : dateA - dateB;
+        };
+    },
+
     /**
      * Show status message
      * @param {string} message - Message to display
@@ -980,6 +1024,10 @@ const UI = {
         // Update title with current count
         title.textContent = `Unclassified Transactions (${stillUnclassified.length})`;
         
+        // Add controls row with auto-assign button
+        const controlsRow = document.createElement('div');
+        controlsRow.style.cssText = 'display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;';
+        
         // Add button to manually trigger auto-assignment
         const autoAssignBtn = document.createElement('button');
         autoAssignBtn.className = 'btn btn-secondary';
@@ -1001,7 +1049,8 @@ const UI = {
             }
             this.renderUnclassifiedTransactions();
         };
-        container.appendChild(autoAssignBtn);
+        controlsRow.appendChild(autoAssignBtn);
+        container.appendChild(controlsRow);
 
         // Group still unclassified transactions by account
         const byAccount = {};
@@ -1027,12 +1076,9 @@ const UI = {
                 return;
             }
 
-            // Sort by date (newest first)
-            accountTxs.sort((a, b) => {
-                const dateA = new Date(a.transaction_date || a.posted_date || 0);
-                const dateB = new Date(b.transaction_date || b.posted_date || 0);
-                return dateB - dateA;
-            });
+            // Sort by date based on current sort state for this account
+            const accountSortOrder = this.sortState.unclassified[accountNum] || 'newest';
+            accountTxs.sort(this.getDateSortComparator(accountSortOrder));
 
             const accountSection = document.createElement('div');
             accountSection.className = 'account-card'; // Collapsed by default
@@ -1052,6 +1098,12 @@ const UI = {
                     <div class="expand-icon">▼</div>
                 </div>
                 <div class="account-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background-color: #fff; border-bottom: 1px solid #f0f0f0;">
+                        <div style="font-size: 0.85em; font-weight: 600; color: #777;">Transactions:</div>
+                        <button class="btn-sort-small" data-account="${accountNum}" title="Toggle sort order">
+                            ${accountSortOrder === 'newest' ? '↓ Newest' : '↑ Oldest'}
+                        </button>
+                    </div>
                     <div class="unclassified-transactions-list">
                         <!-- Transactions injected here -->
                     </div>
@@ -1097,13 +1149,35 @@ const UI = {
                 listContainer.appendChild(txRow);
             });
 
-            // Add toggle logic
+            // Add toggle logic for header
             const header = accountSection.querySelector('.account-header');
             const content = accountSection.querySelector('.account-content');
+            
+            // Restore expanded state if previously expanded
+            if (this.expandedState.unclassifiedAccounts.has(accountNum)) {
+                header.classList.add('expanded');
+                content.classList.add('expanded');
+            }
+            
             header.addEventListener('click', () => {
-                header.classList.toggle('expanded');
+                const isExpanded = header.classList.toggle('expanded');
                 content.classList.toggle('expanded');
+                // Track expanded state
+                if (isExpanded) {
+                    this.expandedState.unclassifiedAccounts.add(accountNum);
+                } else {
+                    this.expandedState.unclassifiedAccounts.delete(accountNum);
+                }
             });
+
+            // Add sort button handler (with stopPropagation to prevent collapse)
+            const sortButton = accountSection.querySelector('.btn-sort-small');
+            if (sortButton) {
+                sortButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUnclassifiedSort(accountNum);
+                });
+            }
 
             container.appendChild(accountSection);
         });
@@ -1526,6 +1600,97 @@ const UI = {
             return;
         }
 
+        // Calculate transaction statistics
+        const savingsAccountNumbers = new Set(savingsAccounts.map(acc => acc.account_number));
+        const relevantTransactions = transactions.filter(tx => 
+            savingsAccountNumbers.has(tx.account_number || 'unknown')
+        );
+        const totalImported = relevantTransactions.length;
+        const ignoredTransactions = relevantTransactions.filter(tx => tx.included === false);
+        const activeTransactions = relevantTransactions.filter(tx => tx.included !== false);
+        const classifiedTransactions = activeTransactions.filter(tx => {
+            const txId = tx.transaction_id || this.generateTransactionId(tx);
+            return classifications[txId];
+        });
+        const unclassifiedTransactions = activeTransactions.filter(tx => {
+            const txId = tx.transaction_id || this.generateTransactionId(tx);
+            return !classifications[txId];
+        });
+
+        // Get unique source files
+        const sourceFiles = [...new Set(
+            transactions
+                .map(tx => tx.source_file)
+                .filter(f => f && f !== 'Unknown Source')
+        )].sort();
+
+        // Get import stats (duplicates filtered)
+        const importStats = Storage.getImportStats();
+        const duplicatesFiltered = importStats.duplicatesFiltered || 0;
+
+        // Use Utils.escapeHtml to prevent XSS attacks
+        const escapeHtml = window.Utils ? Utils.escapeHtml : (t) => t;
+
+        // Add transaction summary
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'transaction-summary';
+        summaryDiv.style.cssText = 'background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.9em;';
+        summaryDiv.innerHTML = `
+            <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 8px;">
+                <div style="font-weight: 600; color: #2c3e50;">Transaction Summary:</div>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                    <span style="color: #666;">
+                        <strong>${totalImported}</strong> imported
+                    </span>
+                    <span style="color: #27ae60;">
+                        <strong>${classifiedTransactions.length}</strong> classified
+                    </span>
+                    ${unclassifiedTransactions.length > 0 ? `
+                        <span style="color: #e67e22;">
+                            <strong>${unclassifiedTransactions.length}</strong> unclassified
+                        </span>
+                    ` : ''}
+                    ${ignoredTransactions.length > 0 ? `
+                        <span style="color: #95a5a6;">
+                            <strong>${ignoredTransactions.length}</strong> ignored
+                        </span>
+                    ` : ''}
+                    ${duplicatesFiltered > 0 ? `
+                        <span style="color: #6c757d;" title="Duplicate transactions that were automatically filtered during import">
+                            <strong>${duplicatesFiltered}</strong> duplicates filtered
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+            ${sourceFiles.length > 0 ? `
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding-top: 8px; border-top: 1px solid #dee2e6;">
+                    <div style="font-weight: 600; color: #2c3e50; white-space: nowrap;">Source Files:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        ${sourceFiles.map(f => `
+                            <span style="background: #e9ecef; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;">
+                                ${escapeHtml(f)}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            <div style="padding-top: 8px; border-top: 1px solid #dee2e6; margin-top: 8px;">
+                <button class="btn btn-secondary btn-small" id="download-diagnostic-csv" style="font-size: 0.85em;">
+                    📋 Download Diagnostic CSV
+                </button>
+                <span style="font-size: 0.8em; color: #888; margin-left: 8px;">
+                    Detailed log for troubleshooting import issues
+                </span>
+            </div>
+        `;
+        container.appendChild(summaryDiv);
+        
+        // Add diagnostic CSV download handler
+        const diagBtn = document.getElementById('download-diagnostic-csv');
+        if (diagBtn) {
+            diagBtn.addEventListener('click', () => this.downloadDiagnosticCSV());
+        }
+
         savingsAccounts.forEach(account => {
             const accountBuckets = buckets.filter(b => b.account_number === account.account_number);
             const accountTransactions = transactions.filter(tx => 
@@ -1562,12 +1727,9 @@ const UI = {
                         return classifications[txId] === bucket.id;
                     });
 
-                    // Sort transactions by date (newest first)
-                    bucketTransactions.sort((a, b) => {
-                        const dateA = new Date(a.transaction_date || a.posted_date || 0);
-                        const dateB = new Date(b.transaction_date || b.posted_date || 0);
-                        return dateB - dateA;
-                    });
+                    // Sort transactions by date based on sort state for this bucket
+                    const bucketSortOrder = this.sortState.breakdown[bucket.id] || 'newest';
+                    bucketTransactions.sort(this.getDateSortComparator(bucketSortOrder));
 
                     // Check for starting allocation
                     const allocation = startingAllocations[bucket.id];
@@ -1616,9 +1778,10 @@ const UI = {
                         });
                     }
 
+                    const bucketIsOpen = this.expandedState.breakdownBuckets.has(bucket.id);
                     bucketsHtml += `
                         <div class="bucket-row-container" style="border-bottom: 1px solid #eee;">
-                            <details style="width: 100%;">
+                            <details style="width: 100%;" data-bucket-id="${bucket.id}" ${bucketIsOpen ? 'open' : ''}>
                                 <summary style="padding: 12px 16px; display: flex; justify-content: space-between; cursor: pointer; align-items: center; list-style: none;">
                                     <div class="bucket-row-name" style="font-weight: 500; display: flex; align-items: center;">
                                         ${bucket.name}
@@ -1629,7 +1792,12 @@ const UI = {
                                     </div>
                                 </summary>
                                 <div class="bucket-transactions" style="padding: 0 16px 12px 16px; background-color: #fafafa; border-top: 1px solid #f0f0f0;">
-                                    <div style="font-size: 0.85em; font-weight: 600; color: #777; margin: 8px 0;">Transactions:</div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                                        <div style="font-size: 0.85em; font-weight: 600; color: #777;">Transactions:</div>
+                                        <button class="btn-sort-small" onclick="event.stopPropagation(); UI.toggleBreakdownSort('${bucket.id}')" title="Toggle sort order">
+                                            ${bucketSortOrder === 'newest' ? '↓ Newest' : '↑ Oldest'}
+                                        </button>
+                                    </div>
                                     ${transactionsHtml}
                                 </div>
                             </details>
@@ -1654,8 +1822,9 @@ const UI = {
                     `;
             }
 
+            const accountIsOpen = this.expandedState.breakdownAccounts.has(account.account_number);
             card.innerHTML = `
-                <details style="width: 100%;">
+                <details style="width: 100%;" data-account-number="${account.account_number}" ${accountIsOpen ? 'open' : ''}>
                     <summary class="account-header" style="background-color: #f0f4f8; border-bottom: 2px solid #ddd; cursor: pointer; padding: 15px; display: flex; justify-content: space-between; align-items: center; list-style: none;">
                         <div class="account-info">
                             <div class="account-name" style="font-size: 1.2em; font-weight: 600;">${accountName}</div>
@@ -1685,14 +1854,201 @@ const UI = {
                 </details>
             `;
             
-            // Remove old custom toggle logic as we use <details> now
-            // const header = card.querySelector('.account-header');
-            // const content = card.querySelector('.account-content');
-            // header.addEventListener('click', () => { ... });
-
             container.appendChild(card);
+
+            // Add event listeners to track open/close state for details elements
+            const accountDetails = card.querySelector('details[data-account-number]');
+            if (accountDetails) {
+                accountDetails.addEventListener('toggle', () => {
+                    const accNum = accountDetails.dataset.accountNumber;
+                    if (accountDetails.open) {
+                        this.expandedState.breakdownAccounts.add(accNum);
+                    } else {
+                        this.expandedState.breakdownAccounts.delete(accNum);
+                    }
+                });
+            }
+
+            // Track bucket details open/close state
+            const bucketDetails = card.querySelectorAll('details[data-bucket-id]');
+            bucketDetails.forEach(details => {
+                details.addEventListener('toggle', () => {
+                    const bucketId = details.dataset.bucketId;
+                    if (details.open) {
+                        this.expandedState.breakdownBuckets.add(bucketId);
+                    } else {
+                        this.expandedState.breakdownBuckets.delete(bucketId);
+                    }
+                });
+            });
         });
 
+    },
+
+    /**
+     * Download diagnostic CSV with detailed transaction information
+     * Helps troubleshoot import and parsing issues
+     */
+    downloadDiagnosticCSV() {
+        const transactions = Storage.getTransactions();
+        const classifications = Storage.getTransactionClassifications();
+        const buckets = Storage.getBuckets();
+        const confirmedAccounts = Storage.getConfirmedAccounts();
+        const savedAccounts = Storage.getSavedAccounts();
+        const importStats = Storage.getImportStats();
+
+        // Create bucket lookup
+        const bucketLookup = {};
+        buckets.forEach(b => { bucketLookup[b.id] = b.name; });
+
+        // Create account lookup
+        const accountLookup = {};
+        confirmedAccounts.forEach(a => { 
+            accountLookup[a.account_number] = { 
+                name: a.account_name, 
+                type: a.account_type,
+                confirmed: true
+            }; 
+        });
+        savedAccounts.forEach(a => { 
+            if (!accountLookup[a.account_number]) {
+                accountLookup[a.account_number] = { 
+                    name: a.account_name, 
+                    type: a.account_type,
+                    confirmed: false
+                };
+            }
+        });
+
+        // CSV Header
+        const headers = [
+            'Row',
+            'Transaction ID',
+            'Date',
+            'Description',
+            'Amount',
+            'Credit/Debit',
+            'Account Number',
+            'Account Name',
+            'Account Type',
+            'Account Confirmed',
+            'Source File',
+            'Included',
+            'Classified Bucket',
+            'Transaction Type',
+            'Provider',
+            'Merchant',
+            'Source',
+            'Raw Amount',
+            'Currency'
+        ];
+
+        // Build CSV rows
+        const rows = [headers.join(',')];
+        
+        transactions.forEach((tx, index) => {
+            const txId = tx.transaction_id || this.generateTransactionId(tx);
+            const bucketId = classifications[txId];
+            const bucketName = bucketId ? bucketLookup[bucketId] : '';
+            const accountInfo = accountLookup[tx.account_number] || {};
+            
+            const row = [
+                index + 1,
+                this.escapeCSV(txId),
+                this.escapeCSV(tx.transaction_date || tx.posted_date || ''),
+                this.escapeCSV(tx.description || tx.user_description || ''),
+                tx.amount || 0,
+                this.escapeCSV(tx.credit_debit || (parseFloat(tx.amount) >= 0 ? 'credit' : 'debit')),
+                this.escapeCSV(tx.account_number || 'unknown'),
+                this.escapeCSV(accountInfo.name || tx.account_name || ''),
+                this.escapeCSV(accountInfo.type || ''),
+                accountInfo.confirmed ? 'Yes' : 'No',
+                this.escapeCSV(tx.source_file || ''),
+                tx.included === false ? 'No (Ignored)' : 'Yes',
+                this.escapeCSV(bucketName || '(Unclassified)'),
+                this.escapeCSV(tx.transaction_type || ''),
+                this.escapeCSV(tx.provider_name || ''),
+                this.escapeCSV(tx.merchant_name || ''),
+                this.escapeCSV(tx.source || ''),
+                this.escapeCSV(String(tx.amount)),
+                this.escapeCSV(tx.currency || 'AUD')
+            ];
+            
+            rows.push(row.join(','));
+        });
+
+        // Add summary section at the end
+        rows.push('');
+        rows.push('--- DIAGNOSTIC SUMMARY ---');
+        rows.push(`Total Transactions in Storage,${transactions.length}`);
+        rows.push(`Duplicates Filtered (cumulative),${importStats.duplicatesFiltered || 0}`);
+        rows.push(`Confirmed Accounts,${confirmedAccounts.length}`);
+        rows.push(`Saved Accounts,${savedAccounts.length}`);
+        rows.push(`Buckets Defined,${buckets.length}`);
+        rows.push('');
+        
+        // Transactions by source file
+        rows.push('--- TRANSACTIONS BY SOURCE FILE ---');
+        const bySource = {};
+        transactions.forEach(tx => {
+            const source = tx.source_file || 'Unknown';
+            bySource[source] = (bySource[source] || 0) + 1;
+        });
+        Object.entries(bySource).forEach(([source, count]) => {
+            rows.push(`${this.escapeCSV(source)},${count}`);
+        });
+        rows.push('');
+        
+        // Transactions by account
+        rows.push('--- TRANSACTIONS BY ACCOUNT ---');
+        const byAccount = {};
+        transactions.forEach(tx => {
+            const acc = tx.account_number || 'Unknown';
+            byAccount[acc] = (byAccount[acc] || 0) + 1;
+        });
+        Object.entries(byAccount).forEach(([acc, count]) => {
+            const info = accountLookup[acc] || {};
+            rows.push(`${this.escapeCSV(acc)},${this.escapeCSV(info.name || '')},${info.type || ''},${count}`);
+        });
+        rows.push('');
+        
+        // Classification summary
+        rows.push('--- CLASSIFICATION SUMMARY ---');
+        const included = transactions.filter(tx => tx.included !== false);
+        const ignored = transactions.filter(tx => tx.included === false);
+        const classified = included.filter(tx => {
+            const txId = tx.transaction_id || this.generateTransactionId(tx);
+            return classifications[txId];
+        });
+        rows.push(`Included Transactions,${included.length}`);
+        rows.push(`Ignored Transactions,${ignored.length}`);
+        rows.push(`Classified Transactions,${classified.length}`);
+        rows.push(`Unclassified Transactions,${included.length - classified.length}`);
+        
+        // Download
+        const csvContent = rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bank-buckets-diagnostic-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        this.showStatus('Diagnostic CSV downloaded', 'success');
+    },
+
+    /**
+     * Escape a value for CSV format
+     */
+    escapeCSV(value) {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        // If contains comma, quote, or newline, wrap in quotes and escape internal quotes
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
     }
 };
 

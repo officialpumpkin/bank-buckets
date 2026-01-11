@@ -17,6 +17,9 @@ const DuplicateDetector = {
             const amount1 = Math.abs(parseFloat(tx1.amount) || 0);
             const amount2 = Math.abs(parseFloat(tx2.amount) || 0);
             if (Math.abs(amount1 - amount2) < 0.05) {
+                // #region agent log
+                if (!this._loggedRefMatch) { this._loggedRefMatch = 0; } if (this._loggedRefMatch < 5) { this._loggedRefMatch++; fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'duplicate-detector.js:areDuplicates:refMatch',message:'RefID match',data:{ref1,ref2,amount1,amount2,desc1:(tx1.description||'').substring(0,60),desc2:(tx2.description||'').substring(0,60)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{}); }
+                // #endregion
                 return true; // ID match + Amount match = Duplicate
             }
         }
@@ -69,6 +72,9 @@ const DuplicateDetector = {
             // If one contains the other (e.g. "Transfer" vs "Transfer Ref#..."), match!
             // Or if similarity is high
             if (desc1.includes(desc2) || desc2.includes(desc1)) {
+                // #region agent log
+                if (!this._loggedDescContains) { this._loggedDescContains = 0; } if (this._loggedDescContains < 5) { this._loggedDescContains++; fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'duplicate-detector.js:areDuplicates:descContains',message:'Desc contains match',data:{desc1:desc1.substring(0,60),desc2:desc2.substring(0,60),date1:tx1.transaction_date,date2:tx2.transaction_date,amount1:tx1.amount,amount2:tx2.amount},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{}); }
+                // #endregion
                 return true;
             }
 
@@ -78,6 +84,9 @@ const DuplicateDetector = {
             }
         }
 
+        // #region agent log
+        if (!this._loggedFinalMatch) { this._loggedFinalMatch = 0; } if (this._loggedFinalMatch < 5) { this._loggedFinalMatch++; fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'duplicate-detector.js:areDuplicates:finalMatch',message:'Final similarity match',data:{desc1:desc1.substring(0,60),desc2:desc2.substring(0,60),date1:tx1.transaction_date,date2:tx2.transaction_date,amount1:tx1.amount,amount2:tx2.amount},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{}); }
+        // #endregion
         return true;
     },
 
@@ -134,7 +143,11 @@ const DuplicateDetector = {
         let duplicatesCount = 0;
         let uniqueCount = 0;
 
-        newTransactions.forEach(newTx => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'duplicate-detector.js:mergeTransactions',message:'Merge start',data:{existingCount:existingTransactions.length,newCount:newTransactions.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
+        newTransactions.forEach((newTx, newIdx) => {
             const matchIndex = merged.findIndex(existingTx => 
                 this.areDuplicates(newTx, existingTx)
             );
@@ -142,6 +155,9 @@ const DuplicateDetector = {
             if (matchIndex !== -1) {
                 // Duplicate found - MERGE DATA
                 duplicatesCount++;
+                // #region agent log
+                if (duplicatesCount <= 10) { fetch('http://127.0.0.1:7242/ingest/9cad563e-b494-4967-bd12-266b766fec3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'duplicate-detector.js:mergeTransactions',message:'Duplicate found',data:{newIdx,newTxDate:newTx.transaction_date,newTxDesc:(newTx.description||'').substring(0,50),newTxAmount:newTx.amount,newTxAccount:newTx.account_number,matchedTxDate:merged[matchIndex].transaction_date,matchedTxDesc:(merged[matchIndex].description||'').substring(0,50),matchedTxAmount:merged[matchIndex].amount,matchedTxAccount:merged[matchIndex].account_number},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C,D'})}).catch(()=>{}); }
+                // #endregion
                 const existingTx = merged[matchIndex];
                 
                 // 1. Improve Description: Keep the longer one

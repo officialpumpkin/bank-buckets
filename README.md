@@ -20,8 +20,8 @@ Bank Buckets shows users how money inside real bank accounts is internally alloc
 
 ### MVP Capabilities
 
-1. **CSV Import** - Import transaction data from Frollo app exports
-2. **PDF Statement Import** - Parse and import transactions from bank statement PDFs
+1. **CSV Import** - Import transaction data from Frollo app exports or direct bank CSV downloads
+2. ~~**PDF Statement Import** - Parse and import transactions from bank statement PDFs~~ *(Currently disabled - data parsing was unreliable)*
 3. **Duplicate Detection** - Automatically filters out duplicate transactions when importing from multiple sources
 4. **Automatic Bucket Suggestions** - The app scans transactions and suggests buckets based on recurring patterns
 5. **Hybrid Matching** - Accept suggestions or manually create/edit buckets with keyword rules
@@ -33,8 +33,7 @@ Bank Buckets shows users how money inside real bank accounts is internally alloc
 
 1. Open `index.html` in a modern web browser
 2. Import your transactions:
-   - Click "Import CSV" to import from Frollo app exports, OR
-   - Click "Import PDF Statement" to import from bank statement PDFs
+   - Click "Import CSV" to import from Frollo app exports or direct bank CSV downloads
 3. The app will automatically detect and filter out duplicate transactions
 4. Review the suggested buckets and accept or modify them
 5. Set starting allocation amounts for each bucket (optional)
@@ -45,7 +44,26 @@ Bank Buckets shows users how money inside real bank accounts is internally alloc
 
 ### CSV Format
 
-The app expects CSV files exported from the Frollo app with the following headers (at minimum):
+The app supports multiple CSV formats and will auto-detect the format based on the headers.
+
+#### Qudos Bank Direct Export (Recommended)
+
+Export transaction CSV files directly from your Qudos Bank online banking. Each account will have its own CSV file.
+
+**Filename format:** `Statement_XXXXXXXX_DD.MM.YY-DD.MM.YY.csv` (where `XXXXXXXX` is the 8-10 digit account number)
+
+**Headers:**
+- `Effective Date`
+- `Entered Date`
+- `Transaction Description`
+- `Amount`
+- `Balance`
+
+The account number is automatically extracted from the filename.
+
+#### Frollo App Export
+
+The app also supports CSV files exported from the Frollo app with the following headers:
 
 - `transaction_id`
 - `description`
@@ -66,14 +84,9 @@ The app expects CSV files exported from the Frollo app with the following header
 - `notes`
 - `included`
 
-### PDF Statement Format
+### PDF Statement Format (Disabled)
 
-The app can parse bank statement PDFs. It automatically:
-- Extracts transaction dates, amounts, and descriptions
-- Identifies account numbers and names from the statement
-- Handles various statement formats (table-based, line-item, etc.)
-
-**Note:** PDF parsing works best with standard bank statement formats. If your bank uses a non-standard format, you may need to use CSV import instead.
+> **Note:** PDF parsing has been disabled due to unreliable data extraction. Please use CSV exports directly from your bank for more consistent and trustworthy transaction data.
 
 ### Duplicate Detection
 

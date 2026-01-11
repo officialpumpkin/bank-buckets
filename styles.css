@@ -811,3 +811,40 @@ summary::marker {
     display: flex;
     align-items: flex-start;
 }
+
+/* Sort Controls */
+.sort-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.sort-toggle-btn:hover {
+    background-color: var(--color-bg-hover);
+}
+
+.sort-icon {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.btn-sort-small {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    font-size: 0.8em;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-sort-small:hover {
+    background-color: var(--color-bg-light);
+    color: var(--color-text);
+    border-color: var(--color-primary);
+}
